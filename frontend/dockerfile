@@ -1,0 +1,23 @@
+# Dockerfile for Next.js frontend
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy all frontend files
+COPY ./speech2text .
+# Install dependencies
+RUN npm install
+# Build the Next.js project
+RUN npm run build
+
+# Production image
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+# Copy built output and dependencies
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+
+ENV NODE_ENV=production

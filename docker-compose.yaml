@@ -1,13 +1,18 @@
 services:
-  whisper_s2t:
-    build: .
-    container_name: whisper_s2t
+  backend:
+    build: ./backend
     restart: unless-stopped
     ports:
-      - "8000:8000" # change if the container exposes another port
+      - "8000:8000"
     volumes:
       - ./data:/app/data # adjust according to your needs
-      - ./:/app
-    environment:
-      - DEVICE=cpu
+      - ./backend/:/app
     command: python3 app.py
+  frontend:
+    build: ./frontend # Path to your Next.js frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    command: npm run start
