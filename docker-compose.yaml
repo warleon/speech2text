@@ -1,15 +1,17 @@
 services:
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        - HUGGING_FACE_TOKEN=${HUGGING_FACE_TOKEN}
     restart: unless-stopped
     environment:
-      - HUGGIN_FACE_TOKEN=${HUGGIN_FACE_TOKEN}
+      - HUGGING_FACE_TOKEN=${HUGGING_FACE_TOKEN}
     networks:
       - whisper-net
     volumes:
-      - ./data:/app/data # adjust according to your needs
       - ./backend/:/app
-    command: python3 app.py
+    command: python3 app.py --model=large-v2
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 10s
