@@ -1,0 +1,13 @@
+services:
+  whisper_s2t:
+    build: .
+    container_name: whisper_s2t
+    restart: unless-stopped
+    ports:
+      - "8000:8000" # change if the container exposes another port
+    volumes:
+      - ./data:/app/data # adjust according to your needs
+      - ./:/app
+    environment:
+      - DEVICE=cpu
+    command: python3 app.py
