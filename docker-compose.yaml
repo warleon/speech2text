@@ -2,6 +2,8 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
+    environment:
+      - HUGGIN_FACE_TOKEN=${HUGGIN_FACE_TOKEN}
     networks:
       - whisper-net
     volumes:
