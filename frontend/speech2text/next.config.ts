@@ -6,8 +6,8 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/transcribe",
-        //destination: "http://backend:8000/transcribe",
-        destination: "http://localhost:8000/transcribe",
+        destination: "http://backend:8000/transcribe",
+        //destination: "http://localhost:8000/transcribe",
       },
     ];
   },

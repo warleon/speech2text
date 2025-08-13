@@ -2,17 +2,29 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    networks:
+      - whisper-net
     volumes:
       - ./data:/app/data # adjust according to your needs
       - ./backend/:/app
     command: python3 app.py
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
   frontend:
     build: ./frontend # Path to your Next.js frontend
     ports:
       - "3000:3000"
+    networks:
+      - whisper-net
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
     command: npm run start
+
+networks:
+  whisper-net: # Custom network
+    driver: bridge

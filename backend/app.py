@@ -14,6 +14,10 @@ model = whisper_s2t.load_model(
     compute_type="int8"
 )
 
+@app.route("/", methods=["GET"])
+def hello():
+    return "hello world!"
+
 @app.route("/transcribe", methods=["POST"])
 def transcribe():
     if "audio_file" not in request.files:
