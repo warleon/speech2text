@@ -12,7 +12,6 @@ services:
     volumes:
       - ./backend/:/app
       - shared-uploads:/uploads
-      - ./frontend/speech2text/uploads:/uploads #dev volume
     command: python3 app.py
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
@@ -39,3 +38,8 @@ networks:
 
 volumes:
   shared-uploads:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./frontend/speech2text/uploads
