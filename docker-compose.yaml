@@ -11,7 +11,7 @@ services:
       - whisper-net
     volumes:
       - ./backend/:/app
-    command: python3 app.py --model=large-v2
+    command: python3 app.py
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 10s

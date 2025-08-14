@@ -1,3 +1,5 @@
+import os
+import tempfile
 from flask import Flask, request, jsonify
 from  whisperx import load_audio, assign_word_speakers
 from models import whisper_model, diarize_model
@@ -18,7 +20,12 @@ def transcribe():
     audio_file = request.files["audio_file"]
     #language = request.form.get("language", None)
 
-    audio = load_audio(audio_file)
+    audio_path=None
+    audio = None
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+        audio_path = tmp.name
+        audio_file.save(audio_path)
+        audio = load_audio(audio_path)
 
     try:
         # Perform transcription
@@ -28,6 +35,9 @@ def transcribe():
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"error":e}), 500
+    finally:
+        if os.path.exists(audio_path):
+            os.remove(audio_path)
 
 
 if __name__ == "__main__":
