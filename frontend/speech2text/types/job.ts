@@ -16,9 +16,12 @@ export type FileJobStatus =
 export interface FileJob {
   id: string; // unique per file
   file: File;
+  fileName: string;
+  fileSize: string;
   color: string; // hsl string
   progress: number; // 0..100
   status: FileJobStatus;
   error?: string | null;
   result?: Segment[];
+  removed?: boolean;
 }

@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { randomColor } from "@/lib/utils";
 import { FileJob, FileJobStatus, Segment } from "@/types/job";
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useCallback, useMemo, useEffect } from "react";
 import { usePersistentId } from "./usePersistentId";
+import { usePersistentJobs } from "./usePersistendJobs";
+import { FILE_KEY, FILE_NAME_KEY } from "@/lib/constants";
 
 interface Props {
   fakeProgressDuration: number;
@@ -11,16 +13,49 @@ interface Props {
 export function useFileJobs(
   { fakeProgressDuration }: Props = { fakeProgressDuration: 10000 }
 ) {
-  const [jobs, setJobs] = useState<FileJob[]>([]);
+  const { jobs, setJobs } = usePersistentJobs("jobs");
   const userId = usePersistentId("userId");
 
   const canStart = useMemo(
     () => jobs.some((j) => j.status === "queued"),
     [jobs]
   );
-  const removeJob = useCallback((id: string) => {
-    setJobs((prev) => prev.filter((j) => j.id !== id));
-  }, []);
+  const restoreJob = useCallback(
+    (id: string, file?: File) => {
+      setJobs((prev) =>
+        prev.map((j) => {
+          return j.id === id
+            ? {
+                ...j,
+                removed: false,
+                status: j.status === "error" ? "queued" : j.status,
+                file: file ?? j.file,
+                fileSize: file?.size
+                  ? `${(file.size / (1024 * 1024)).toLocaleString()} MB`
+                  : j.fileSize,
+                fileName: file?.name ?? j.fileName,
+              }
+            : j;
+        })
+      );
+    },
+    [setJobs]
+  );
+  const removeJob = useCallback(
+    (id: string) => {
+      setJobs((prev) =>
+        prev.map((j) => {
+          return j.id === id
+            ? {
+                ...j,
+                removed: true,
+              }
+            : j;
+        })
+      );
+    },
+    [setJobs]
+  );
 
   const addFiles = useCallback(
     (files: FileList | null) => {
@@ -29,18 +64,25 @@ export function useFileJobs(
       Array.from(files).forEach((f) => {
         if (!f.type || !f.type.includes("wav")) return; // only wav
         const id = `${f.name}-${f.size}-${f.lastModified}-${userId}`;
-        if (jobs.find((j) => j.id === id)) return;
+        const alreadyJob = jobs.find((j) => j.id === id);
+        if (alreadyJob) {
+          if (alreadyJob.removed || alreadyJob.status === "error")
+            restoreJob(alreadyJob.id, f);
+          return;
+        }
         items.push({
           id,
           file: f,
+          fileSize: `${(f.size / (1024 * 1024)).toLocaleString()} MB`,
+          fileName: f.name,
           color: randomColor(f.name + f.size + ""),
           progress: 0,
           status: "queued",
-        });
+        } satisfies FileJob);
       });
       if (items.length) setJobs((prev) => [...prev, ...items]);
     },
-    [userId, jobs]
+    [setJobs, userId, jobs, restoreJob]
   );
   const progressJob = useCallback(
     (
@@ -96,22 +138,17 @@ export function useFileJobs(
       }, 500);
       return tick;
     },
-    [fakeProgressDuration]
+    [fakeProgressDuration, setJobs]
   );
 
   const runJob = useCallback(
     async (id: string) => {
-      setJobs((prev) =>
-        prev.map((j) =>
-          j.id === id ? { ...j, status: "uploading", progress: 10 } : j
-        )
-      );
-
       const job = jobs.find((j) => j.id === id);
       if (!job) return;
 
       const form = new FormData();
-      form.append("file", job.file);
+      form.append(FILE_KEY, job.file);
+      form.append(FILE_NAME_KEY, job.id);
 
       const tick = progressJob(id, "uploading");
       try {
@@ -142,6 +179,7 @@ export function useFileJobs(
     // process each queued job sequentially for simplicity
     for (const job of jobs) {
       if (job.status !== "queued") continue;
+      if (job.removed) continue;
       runJob(job.id);
     }
   }, [jobs, runJob]);
@@ -150,7 +188,7 @@ export function useFileJobs(
     start();
   }, [jobs, start]);
 
-  return { jobs, addFiles, canStart, removeJob, runJob };
+  return { jobs, addFiles, canStart, removeJob, runJob, restoreJob };
 }
 
 // EaseInOutCubic function (t from 0 to 1)
