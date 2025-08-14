@@ -11,6 +11,7 @@ services:
       - whisper-net
     volumes:
       - ./backend/:/app
+      - shared-uploads:/uploads
     command: python3 app.py
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
@@ -27,8 +28,13 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
+    volumes:
+      - shared-uploads:/uploads
     command: npm run start
 
 networks:
   whisper-net: # Custom network
     driver: bridge
+
+volumes:
+  shared-uploads:
