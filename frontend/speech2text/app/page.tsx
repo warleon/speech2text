@@ -24,6 +24,7 @@ import {
 import { Upload, Play, X, FileAudio, CheckCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Copy } from "lucide-react";
+import { Dropzone } from "@/components/ui/dropzone";
 
 // Drop this component into app/page.tsx (Next.js App Router)
 // Assumes shadcn/ui is installed and Tailwind is configured.
@@ -58,10 +59,7 @@ function randomColor(seed: string) {
 
 export default function WhisperS2TPage() {
   const [jobs, setJobs] = useState<FileJob[]>([]);
-  const [dragActive, setDragActive] = useState(false);
-  const [language, setLanguage] = useState("en");
 
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const canStart = useMemo(
     () => jobs.some((j) => j.status === "queued"),
     [jobs]
@@ -83,24 +81,6 @@ export default function WhisperS2TPage() {
     });
     if (items.length) setJobs((prev) => [...prev, ...items]);
   }, []);
-
-  const onDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setDragActive(false);
-      addFiles(e.dataTransfer.files);
-    },
-    [addFiles]
-  );
-
-  const onDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
-    setDragActive(true);
-  }, []);
-
-  const onDragLeave = useCallback(() => setDragActive(false), []);
 
   const removeJob = (id: string) =>
     setJobs((prev) => prev.filter((j) => j.id !== id));
@@ -125,7 +105,6 @@ export default function WhisperS2TPage() {
 
     const form = new FormData();
     form.append("audio_file", job.file);
-    form.append("language", language);
 
     try {
       // "Fake" progress while waiting for server response
@@ -218,37 +197,6 @@ export default function WhisperS2TPage() {
             Whisper S2T Batch Transcriber
           </h1>
           <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => inputRef.current?.click()}
-            >
-              <Upload className="mr-2 h-4 w-4" /> Add WAV files
-            </Button>
-            <input
-              ref={inputRef}
-              type="file"
-              accept="audio/wav"
-              multiple
-              className="hidden"
-              onChange={(e) => addFiles(e.target.files)}
-            />
-            <div className="mb-4">
-              <Select
-                onValueChange={(value) => setLanguage(value)}
-                defaultValue="en"
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select language" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="es">Spanish</SelectItem>
-                  <SelectItem value="fr">French</SelectItem>
-                  <SelectItem value="de">German</SelectItem>
-                  {/* Add more languages as needed */}
-                </SelectContent>
-              </Select>
-            </div>
             <Button onClick={startAll} disabled={!canStart}>
               <Play className="mr-2 h-4 w-4" /> Start
             </Button>
@@ -256,22 +204,11 @@ export default function WhisperS2TPage() {
         </div>
 
         {/* Dropzone */}
-        <div
-          onDrop={onDrop}
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          className={
-            "rounded-2xl border-2 border-dashed p-10 text-center transition " +
-            (dragActive
-              ? "border-primary bg-primary/5"
-              : "border-muted-foreground/30")
-          }
-        >
-          <p className="text-sm text-muted-foreground">
-            Drag & drop WAV files here, or click "Add WAV files"
-          </p>
-        </div>
-
+        <Dropzone
+          text="Drag & drop WAV files or click here"
+          addFiles={addFiles}
+          fullScreen={true}
+        />
         {/* File jobs */}
         <div className="grid gap-4">
           <AnimatePresence>
