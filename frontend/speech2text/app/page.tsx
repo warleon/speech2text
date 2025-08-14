@@ -34,6 +34,7 @@ interface Segment {
   start: number;
   end: number;
   text: string;
+  speaker: string;
 }
 
 interface FileJob {
@@ -360,6 +361,7 @@ export default function WhisperS2TPage() {
                             >
                               <TableHead>Start Time (s)</TableHead>
                               <TableHead>End Time (s)</TableHead>
+                              <TableHead>Speaker</TableHead>
                               <TableHead>Text</TableHead>
                               <TableHead>
                                 <button
@@ -380,6 +382,9 @@ export default function WhisperS2TPage() {
                                 </TableCell>
                                 <TableCell className="whitespace-nowrap tabular-nums">
                                   {seg.end}
+                                </TableCell>
+                                <TableCell className="whitespace-nowrap tabular-nums">
+                                  {seg.speaker}
                                 </TableCell>
                                 <TableCell className="whitespace-pre-wrap">
                                   {seg.text}
