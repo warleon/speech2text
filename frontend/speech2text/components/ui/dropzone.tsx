@@ -78,7 +78,10 @@ export function Dropzone({ text, addFiles, fullScreen }: Props) {
         accept="audio/wav"
         multiple
         className="hidden"
-        onChange={(e) => addFiles(e.target.files)}
+        onChange={(e) => {
+          addFiles(e.target.files);
+          if (inputRef.current) inputRef.current.value = "";
+        }}
       />
       {/* Fullscreen overlay for when dragging */}
       {fullScreen && dragActive && (
