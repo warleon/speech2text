@@ -3,7 +3,7 @@ import { writeFile } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 
-const uploadDir = "/uploads";
+const uploadDir = path.join(process.cwd(), "uploads");
 
 export async function POST(req: Request) {
   try {
