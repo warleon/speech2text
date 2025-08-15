@@ -5,21 +5,13 @@ WORKDIR /app
 
 # Install system dependencies in one layer and clean up
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg && \
+    apt-get install -y ffmpeg curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies (grouped for fewer layers)
+COPY . .
 # Upgrade pip before installing
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir whisperx && \
-    pip install --no-cache-dir --upgrade transformers
-
-# Install app-specific dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
-COPY models.py .
+    pip install --no-cache-dir -r requirements.txt
 
 # Pass Hugging Face token as build arg and set as env
 ARG HUGGING_FACE_TOKEN
@@ -29,10 +21,6 @@ ENV HUGGING_FACE_TOKEN=${HUGGING_FACE_TOKEN}
 ENV CTRANSLATE2_CACHE_DIR=/app/models
 
 # Download model at build time
-RUN python3 models.py --model=large-v2
-
-RUN apt-get update && \
-    apt-get install -y curl && \
-    rm -rf /var/lib/apt/lists/*
+RUN python3 models.py
 
 ENTRYPOINT []

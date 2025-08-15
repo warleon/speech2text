@@ -31,9 +31,22 @@ services:
     volumes:
       - shared-uploads:/app/uploads
     command: npm run start
+  rq-dashboard:
+    image: jaredv/rq-docker:0.0.2
+    command: rq-dashboard -H rq-server
+    ports:
+      - 9181:9181
+    networks:
+      - whisper-net
+  rq-server:
+    image: redis:alpine
+    ports:
+      - 6379:6379
+    networks:
+      - whisper-net
 
 networks:
-  whisper-net: # Custom network
+  whisper-net:
     driver: bridge
 
 volumes:

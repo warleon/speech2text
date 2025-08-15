@@ -39,6 +39,11 @@ def transcribe():
         if os.path.exists(audio_path):
             os.remove(audio_path)
 
+@app.route("/preprocess",methods=["POST"])
+def preprocces():
+    pass
+
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
