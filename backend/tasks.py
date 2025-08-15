@@ -2,9 +2,9 @@ import os
 import time
 import torch
 from whisperx import load_audio
-from whisperx.audio import SAMPLE_RATE, CHUNK_LENGTH, N_SAMPLES
+from whisperx.audio import SAMPLE_RATE, CHUNK_LENGTH, N_SAMPLES, log_mel_spectrogram
 from whisperx.vad import merge_chunks
-from models import vad_model, whisper_model
+from models import vad_model, whisper_model, tokenizer, default_asr_options
 import numpy as np
 from queues import single, single_queue, rq_connection
 from rq.job import Job
@@ -17,16 +17,24 @@ EXT = ".npy"
 
 
 def transcribe_segment(
-    segment_path: str, laguage: str, start_time_s: float, end_time_s: float, user: str
+    segment_path: str, start_time_s: float, end_time_s: float, user: str
 ):
-    segment = np.load(segment_path)
-    # TODO think how to set the language
-    transcription = whisper_model.run_single({"inputs": segment})
-    result = {"text": transcription["text"], "start": start_time_s, "end": end_time_s}
+    audio = np.load(segment_path)
+    model_n_mels = whisper_model.feat_kwargs.get("feature_size")
+    features = log_mel_spectrogram(
+        audio,
+        n_mels=model_n_mels if model_n_mels is not None else 80,
+        padding=N_SAMPLES - audio.shape[0],
+    )
+    text = whisper_model.generate_segment_batched(
+        features, tokenizer, default_asr_options
+    )
+    result = {"text": text, "start": start_time_s, "end": end_time_s}
     response = {
         "transcription": result,
         "user": user,
         "task_type": "transcribe_segment",
+        "segment_path": segment_path,
     }
     rq_connection.publish(single, json.dump(response))
     return response
@@ -78,15 +86,13 @@ def merge_jobs(job_a_id, job_b_id, user: str):
         ja.refresh()
         jb.refresh()
 
-    ja_response = ja.result
+    ja_response = ja.result  # TODO test if language detection is necesary
     jb_response = jb.result
     for fp, (s, e) in zip(
         jb_response["segments_output_paths"], jb_response["segments_timestamps"]
     ):
         segment = np.load(fp)
-        single_queue.enqueue(
-            transcribe_segment, segment, ja_response["detected_language"], s, e, user
-        )
+        single_queue.enqueue(transcribe_segment, segment, s, e, user)
 
     response = {}  # TODO:think of response
     rq_connection.publish(single, json.dump(response))
