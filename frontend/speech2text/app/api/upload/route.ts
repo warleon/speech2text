@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { writeFile } from "fs/promises";
 import path from "path";
-import { FILE_KEY, FILE_NAME_KEY } from "@/lib/constants";
+import { FILE_KEY, FILE_NAME_KEY, USER_KEY } from "@/lib/constants";
+import axios from "axios";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 
@@ -10,6 +11,7 @@ export async function POST(req: Request) {
     const formData = await req.formData();
     const file = formData.get(FILE_KEY) as File | null;
     const file_name = formData.get(FILE_NAME_KEY) as string | null;
+    const user = formData.get(USER_KEY) as string | null;
 
     if (!file || !file_name) {
       return NextResponse.json(
@@ -27,8 +29,11 @@ export async function POST(req: Request) {
 
     // Save file with random name
     await writeFile(path.join(uploadDir, file_name), buffer);
-    fetch(`/api/transcribe?file=${file_name}`).catch((e) => {
-      console.error(e);
+    axios.get("/api/dispatch", {
+      params: {
+        file: file_name,
+        user,
+      },
     });
 
     return NextResponse.json({ message: "File uploaded successfully" });

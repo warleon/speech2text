@@ -11,14 +11,12 @@ RUN apt-get update && \
 COPY . .
 # Upgrade pip before installing
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt &&\
+    pip install --no-cache-dir transformers -U
 
 # Pass Hugging Face token as build arg and set as env
 ARG HUGGING_FACE_TOKEN
 ENV HUGGING_FACE_TOKEN=${HUGGING_FACE_TOKEN}
-
-# Set CTranslate2 model cache directory
-ENV CTRANSLATE2_CACHE_DIR=/app/models
 
 # Download model at build time
 RUN python3 models.py

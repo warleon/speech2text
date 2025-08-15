@@ -1,7 +1,6 @@
 import os
 from whisperx.asr import load_model
 from whisperx.diarize import DiarizationPipeline
-from whisperx.vads import Pyannote
 
 HUGGING_FACE_TOKEN=os.environ.get("HUGGING_FACE_TOKEN")
 if(HUGGING_FACE_TOKEN == None):
@@ -12,7 +11,6 @@ whisper_model = load_model(
     "large-v2",
     "cpu",
     compute_type="int8",
-    vad_method="pyannote",
 )
 vad_model = whisper_model.vad_model
 
