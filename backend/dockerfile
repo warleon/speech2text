@@ -8,11 +8,13 @@ RUN apt-get update && \
     apt-get install -y ffmpeg curl && \
     rm -rf /var/lib/apt/lists/*
 
-COPY . .
+COPY requirements.txt .
 # Upgrade pip before installing
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt &&\
     pip install --no-cache-dir transformers -U
+
+COPY . .
 
 # Pass Hugging Face token as build arg and set as env
 ARG HUGGING_FACE_TOKEN
