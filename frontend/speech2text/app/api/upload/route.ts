@@ -29,14 +29,20 @@ export async function POST(req: Request) {
 
     // Save file
     await writeFile(path.join(uploadDir, file_name), buffer);
-    axios.get(`${process.env.NEXT_PUBLIC_BASE_URL}/api/dispatch`, {
-      params: {
-        file: file_name,
-        user: user,
-      },
-    });
+    const { data: backendResponse } = await axios.get(
+      `${process.env.NEXT_PUBLIC_BASE_URL}/api/dispatch`,
+      {
+        params: {
+          file: file_name,
+          user: user,
+        },
+      }
+    );
 
-    return NextResponse.json({ message: "File uploaded successfully" });
+    return NextResponse.json({
+      message: "File uploaded successfully",
+      ...backendResponse,
+    });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "File upload failed" }, { status: 500 });

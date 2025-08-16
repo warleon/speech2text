@@ -3,12 +3,10 @@ from flask_sock import Sock
 from queues import single_queue
 from pubsub import pubsub_listener
 from tasks import convert_to_numpy
+from worker import start_workers
 import threading
 
 # todo remove hypercorn from the requirements
-from hypercorn.config import Config
-from hypercorn.asyncio import serve
-import asyncio
 
 
 app = Flask(__name__)
@@ -46,4 +44,5 @@ def websocket(conn):
 
 if __name__ == "__main__":
     threading.Thread(target=pubsub_listener, args=[connections], daemon=True).start()
+    start_workers()
     app.run(debug=True, host="0.0.0.0", port=8000)
