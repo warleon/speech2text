@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     axios.get(`${process.env.NEXT_PUBLIC_BASE_URL}/api/dispatch`, {
       params: {
         file: file_name,
-        user,
+        user: user,
       },
     });
 

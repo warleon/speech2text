@@ -4,8 +4,9 @@ import { FileJob, FileJobStatus, Segment } from "@/types/job";
 import { useCallback, useMemo, useEffect } from "react";
 import { usePersistentId } from "./usePersistentId";
 import { usePersistentJobs } from "./usePersistendJobs";
-import { FILE_KEY, FILE_NAME_KEY } from "@/lib/constants";
+import { FILE_KEY, FILE_NAME_KEY, USER_KEY } from "@/lib/constants";
 import { useBackendSubscription } from "./useBackendSubscription";
+import axios from "axios";
 
 interface Props {
   fakeProgressDuration: number;
@@ -160,33 +161,22 @@ export function useFileJobs(
       const job = jobs.find((j) => j.id === id);
       if (!job) return;
 
-      const form = new FormData();
-      form.append(FILE_KEY, job.file);
-      form.append(FILE_NAME_KEY, job.id);
+      const formData = new FormData();
+      formData.append(FILE_KEY, job.file);
+      formData.append(FILE_NAME_KEY, job.id);
+      formData.append(USER_KEY, userId);
 
       const tick = progressJob(id, "uploading");
       try {
-        const res = await fetch("/api/upload", {
-          method: "POST",
-          body: form,
-        });
-        const data = await res.json();
-        console.log("BACKEND RESPONSE:", data);
+        const res = await axios.post("/api/upload", formData);
+        console.log("BACKEND RESPONSE:", res);
 
-        if (!res.ok) {
-          const msg = !res.ok
-            ? data?.error || res.statusText
-            : "Unexpected response";
-          progressJob(id, "error", tick!, true, msg);
-          return;
-        }
-
-        progressJob(id, "uploaded", tick!, true, null, data);
+        progressJob(id, "uploaded", tick!, true, null);
       } catch (err: any) {
         progressJob(id, "error", tick!, true, err.message);
       }
     },
-    [jobs, progressJob]
+    [jobs, progressJob, userId]
   );
 
   const start = useCallback(() => {
