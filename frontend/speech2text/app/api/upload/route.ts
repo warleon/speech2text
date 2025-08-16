@@ -27,9 +27,9 @@ export async function POST(req: Request) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Save file with random name
+    // Save file
     await writeFile(path.join(uploadDir, file_name), buffer);
-    axios.get("/api/dispatch", {
+    axios.get(`${process.env.NEXT_PUBLIC_BASE_URL}/api/dispatch`, {
       params: {
         file: file_name,
         user,

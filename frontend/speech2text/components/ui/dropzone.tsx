@@ -1,3 +1,4 @@
+import { useWindow } from "@/hooks/useWindow";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface Props {
@@ -6,6 +7,7 @@ interface Props {
   fullScreen?: boolean;
 }
 export function Dropzone({ text, addFiles, fullScreen }: Props) {
+  const window = useWindow();
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const dragCounter = useRef(0);
@@ -45,16 +47,16 @@ export function Dropzone({ text, addFiles, fullScreen }: Props) {
 
   useEffect(() => {
     if (fullScreen) {
-      window.addEventListener("dragover", onDragOver);
-      window.addEventListener("dragenter", onDragEnter);
-      window.addEventListener("dragleave", onDragLeave);
-      window.addEventListener("drop", onDrop);
+      window?.addEventListener("dragover", onDragOver);
+      window?.addEventListener("dragenter", onDragEnter);
+      window?.addEventListener("dragleave", onDragLeave);
+      window?.addEventListener("drop", onDrop);
 
       return () => {
-        window.removeEventListener("dragover", onDragOver);
-        window.removeEventListener("dragenter", onDragEnter);
-        window.removeEventListener("dragleave", onDragLeave);
-        window.removeEventListener("drop", onDrop);
+        window?.removeEventListener("dragover", onDragOver);
+        window?.removeEventListener("dragenter", onDragEnter);
+        window?.removeEventListener("dragleave", onDragLeave);
+        window?.removeEventListener("drop", onDrop);
       };
     }
   }, [onDrop, onDragOver, onDragLeave, onDragEnter, fullScreen]);

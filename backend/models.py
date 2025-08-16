@@ -9,10 +9,11 @@ import faster_whisper
 HUGGING_FACE_TOKEN = os.environ.get("HUGGING_FACE_TOKEN")
 if HUGGING_FACE_TOKEN == None:
     raise ValueError("HUGGING_FACE_TOKEN not set, value:{0}".format(HUGGING_FACE_TOKEN))
+MODELS_DOWNLOAD_PATH = os.environ.get("MODELS_DOWNLOAD_PATH")
 
 default_vad_options = {"vad_onset": 0.500, "vad_offset": 0.363}
 default_asr_options = faster_whisper.transcribe.TranscriptionOptions(
-    {
+    **{
         "beam_size": 5,
         "best_of": 5,
         "patience": 1,
@@ -34,7 +35,6 @@ default_asr_options = faster_whisper.transcribe.TranscriptionOptions(
         "word_timestamps": False,
         "prepend_punctuations": "\"'“¿([{-",
         "append_punctuations": "\"'.。,，!！?？:：”)]}、",
-        "suppress_numerals": False,
         "max_new_tokens": None,
         "clip_timestamps": None,
         "hallucination_silence_threshold": None,
@@ -50,9 +50,7 @@ tokenizer = tokenizers.Tokenizer.from_pretrained(
 )
 
 whisper_model = WhisperModel(
-    "large-v2",
-    device="cpu",
-    compute_type="int8",
+    "large-v2", device="cpu", compute_type="int8", download_root=MODELS_DOWNLOAD_PATH
 )
 
 diarize_model = DiarizationPipeline(use_auth_token=HUGGING_FACE_TOKEN, device="cpu")

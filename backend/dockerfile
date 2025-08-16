@@ -14,11 +14,13 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt &&\
     pip install --no-cache-dir transformers -U
 
-COPY . .
+COPY models.py .
 
 # Pass Hugging Face token as build arg and set as env
 ARG HUGGING_FACE_TOKEN
 ENV HUGGING_FACE_TOKEN=${HUGGING_FACE_TOKEN}
+ARG MODELS_DOWNLOAD_PATH
+ENV MODELS_DOWNLOAD_PATH=${MODELS_DOWNLOAD_PATH}
 
 # Download model at build time
 RUN python3 models.py

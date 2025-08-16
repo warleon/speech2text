@@ -4,6 +4,7 @@ services:
       context: ./backend
       args:
         - HUGGING_FACE_TOKEN=${HUGGING_FACE_TOKEN}
+        - MODELS_DOWNLOAD_PATH=/models
     restart: unless-stopped
     environment:
       - HUGGING_FACE_TOKEN=${HUGGING_FACE_TOKEN}
@@ -12,11 +13,14 @@ services:
     volumes:
       - ./backend/:/app
       - shared-uploads:/uploads
+      - models-downloads:/models
     command: python3 app.py
+    ports:
+      - 8000:8000
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
-      interval: 10s
-      timeout: 5s
+      interval: 20s
+      timeout: 10s
       retries: 10
   frontend:
     build: ./frontend # Path to your Next.js frontend
@@ -56,3 +60,9 @@ volumes:
       type: none
       o: bind
       device: ./frontend/speech2text/uploads
+  models-downloads:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./models

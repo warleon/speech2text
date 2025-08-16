@@ -1,3 +1,4 @@
+"use client";
 import {
   backendResponse,
   languageDetectionResponse,
@@ -8,6 +9,7 @@ import {
 } from "@/types/backend";
 import { useEffect, useMemo } from "react";
 import useWebSocket from "react-use-websocket";
+import { useWindow } from "./useWindow";
 
 interface Props {
   user: string;
@@ -21,13 +23,17 @@ interface Props {
 }
 
 export function useBackendSubscription({ user, on }: Props) {
+  //const window = useWindow();
   const connectionString = useMemo(() => {
-    const host = window.location.host;
-    return `ws://${host}/api/ws?user=${user}`; //TODO: should be url sanitized
-  }, [user]);
-  const { lastJsonMessage } = useWebSocket<backendResponse>(connectionString);
+    const host = "localhost:8000";
+    return `ws://${host}/ws?user=${user}`; //TODO: should be url sanitized
+  }, [user /*window*/]);
+  const { lastJsonMessage } = useWebSocket<backendResponse | null>(
+    connectionString
+  );
+  console.log(lastJsonMessage);
   useEffect(() => {
-    switch (lastJsonMessage.task_type) {
+    switch (lastJsonMessage?.task_type) {
       case "convert_to_numpy":
         if (on?.preProcess) on.preProcess(lastJsonMessage as toNumpyResponse);
         break;
@@ -46,9 +52,8 @@ export function useBackendSubscription({ user, on }: Props) {
         if (on?.transcription)
           on.transcription(lastJsonMessage as transcriptionResponse);
         break;
-
       default:
         break;
     }
-  }, [lastJsonMessage]);
+  }, [lastJsonMessage, on]);
 }

@@ -5,9 +5,9 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: "/api/transcribe",
-        destination: "http://backend:8000/transcribe",
-        //destination: "http://localhost:8000/transcribe",
+        source: "/api/dispatch",
+        //destination: "http://backend:8000/dispatch",
+        destination: "http://localhost:8000/dispatch",
       },
     ];
   },

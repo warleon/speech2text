@@ -5,6 +5,7 @@ import { useCallback, useMemo, useEffect } from "react";
 import { usePersistentId } from "./usePersistentId";
 import { usePersistentJobs } from "./usePersistendJobs";
 import { FILE_KEY, FILE_NAME_KEY } from "@/lib/constants";
+import { useBackendSubscription } from "./useBackendSubscription";
 
 interface Props {
   fakeProgressDuration: number;
@@ -15,6 +16,19 @@ export function useFileJobs(
 ) {
   const { jobs, setJobs } = usePersistentJobs("jobs");
   const userId = usePersistentId("userId");
+  const logIt = useCallback((m: unknown) => {
+    console.log(m);
+  }, []);
+  useBackendSubscription({
+    user: userId,
+    on: {
+      languageFound: logIt,
+      merge: logIt,
+      preProcess: logIt,
+      segmentation: logIt,
+      transcription: logIt,
+    },
+  });
 
   const canStart = useMemo(
     () => jobs.some((j) => j.status === "queued"),

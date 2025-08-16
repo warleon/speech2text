@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 export function usePersistentId(key: string) {
-  const [id, setId] = useState<string | null>(null);
+  const [id, setId] = useState<string>(crypto.randomUUID());
 
   useEffect(() => {
     let storedId = localStorage.getItem(key);

@@ -1,16 +1,18 @@
 from flask import Flask, request, jsonify
 from flask_sock import Sock
-from .queues import single_queue
-from .pubsub import pubsub_listener
-from .tasks import convert_to_numpy
+from queues import single_queue
+from pubsub import pubsub_listener
+from tasks import convert_to_numpy
 import threading
+
+# todo remove hypercorn from the requirements
 from hypercorn.config import Config
 from hypercorn.asyncio import serve
 import asyncio
 
 
 app = Flask(__name__)
-ws = Sock(app)
+webSocket = Sock(app)
 connections = dict()
 
 
@@ -27,10 +29,11 @@ def dispatch():
     return jsonify({"job_id": job.id})
 
 
-@ws.route("/ws")
+@webSocket.route("/ws")
 def websocket(conn):
     user = request.args["user"]
     connections[user] = conn
+
     try:
         while True:
             # Keep reading to prevent disconnect
@@ -42,7 +45,5 @@ def websocket(conn):
 
 
 if __name__ == "__main__":
-    config = Config()
-    config.bind = ["0.0.0.0:8000"]
     threading.Thread(target=pubsub_listener, args=[connections], daemon=True).start()
-    asyncio.run(serve(app, config))
+    app.run(debug=True, host="0.0.0.0", port=8000)

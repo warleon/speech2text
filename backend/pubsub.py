@@ -1,4 +1,4 @@
-from .queues import rq_connection, single
+from queues import rq_connection, single
 import json
 
 
