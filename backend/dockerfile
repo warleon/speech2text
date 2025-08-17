@@ -14,9 +14,6 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt &&\
     pip install --no-cache-dir transformers -U
 
-COPY patches patches
-RUN patch /usr/local/lib/python3.8/dist-packages/rq/intermediate_queue.py < ./patches/intermediate_queue.patch
-
 COPY models.py .
 
 # Pass Hugging Face token as build arg and set as env

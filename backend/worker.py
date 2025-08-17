@@ -11,7 +11,7 @@ workers = WorkerPool(
     connection=rq_connection,
     num_workers=4,
     # worker_class=SimpleWorker,
-    serializer=JSONSerializer,
+    # serializer=JSONSerializer,
 )
 
 
