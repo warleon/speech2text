@@ -12,7 +12,7 @@ import json
 
 
 UPLOADS = "/uploads"
-WHISPER_DATA = "/whisper-data"
+WHISPER_DATA = UPLOADS
 EXT = ".npy"
 
 
@@ -37,21 +37,22 @@ def transcribe_segment(
         "task_id": task_id,
         "segment_path": segment_path,
     }
-    rq_connection.publish(single, json.dump(response))
+    rq_connection.publish(single, json.dumps(response))
     return response
 
 
-def detect_language(file_name: str, user: str, task_id: str):
-    audio = np.load(file_name)
-    lang = whisper_model.detect_language(audio)  # single language
-    response = {
-        "detected_language": lang,
-        "user": user,
-        "task_type": "detect_language",
-        "task_id": task_id,
-    }
-    rq_connection.publish(single, json.dump(response))
-    return response
+# TODO think on how to integrate this
+# def detect_language(file_name: str, user: str, task_id: str):
+#    audio = np.load(file_name)
+#    lang = whisper_model.detect_language(audio)  # single language
+#    response = {
+#        "detected_language": lang,
+#        "user": user,
+#        "task_type": "detect_language",
+#        "task_id": task_id,
+#    }
+#    rq_connection.publish(single, json.dumps(response))
+#    return response
 
 
 def detect_voice_segments(file_name: str, user: str, task_id: str):
@@ -69,8 +70,9 @@ def detect_voice_segments(file_name: str, user: str, task_id: str):
         os.path.join(WHISPER_DATA, str(i) + str(total) + file_name)
         for i in range(total)
     ]
-    for op, sa in zip(out_paths, split_audio):
+    for op, sa, (s, e) in zip(out_paths, split_audio, timestamps):
         np.save(op, sa)
+        single_queue.enqueue(transcribe_segment, op, s, e, user, task_id)
 
     response = {
         "segments_output_paths": out_paths,
@@ -80,61 +82,61 @@ def detect_voice_segments(file_name: str, user: str, task_id: str):
         "task_type": "detect_voice_segments",
     }
 
-    rq_connection.publish(single, json.dump(response))
+    rq_connection.publish(single, json.dumps(response))
     return response
 
 
-def merge_jobs(job_a_id, job_b_id, user: str, task_id: str):
-    ja = Job.fetch(job_a_id, connection=rq_connection)
-    jb = Job.fetch(job_b_id, connection=rq_connection)
-    # Wait until both finish
-    while not (ja.is_finished and jb.is_finished):
-        time.sleep(1)
-        ja.refresh()
-        jb.refresh()
-
-    ja_response = ja.result  # TODO test if language detection is necesary
-    jb_response = jb.result
-    for fp, (s, e) in zip(
-        jb_response["segments_output_paths"], jb_response["segments_timestamps"]
-    ):
-        segment = np.load(fp)
-        single_queue.enqueue(transcribe_segment, segment, s, e, user)
-
-    response = {
-        "user": user,
-        "task_id": task_id,
-        "task_type": "merge_jobs",
-    }  # TODO:think of response
-    rq_connection.publish(single, json.dump(response))
-    return response
+# def merge_jobs(job_a_id, job_b_id, user: str, task_id: str):
+#    ja = Job.fetch(job_a_id, connection=rq_connection)
+#    jb = Job.fetch(job_b_id, connection=rq_connection)
+#    # Wait until both finish
+#    while not (ja.is_finished and jb.is_finished):
+#        time.sleep(1)
+#        ja.refresh()
+#        jb.refresh()
+#
+#    ja_response = ja.result  # TODO test if language detection is necesary
+#    jb_response = jb.result
+#    for fp, (s, e) in zip(
+#        jb_response["segments_output_paths"], jb_response["segments_timestamps"]
+#    ):
+#        segment = np.load(fp)
+#        single_queue.enqueue(transcribe_segment, segment, s, e, user)
+#
+#    response = {
+#        "user": user,
+#        "task_id": task_id,
+#        "task_type": "merge_jobs",
+#    }  # TODO:think of response
+#    rq_connection.publish(single, json.dumps(response))
+#    return response
 
 
 def convert_to_numpy(file_name: str, user: str, task_id: str):
     in_path = os.path.join(UPLOADS, file_name)
     out_path = os.path.join(WHISPER_DATA, file_name) + EXT
-    lang_out_path = os.path.join(WHISPER_DATA, file_name) + "-LANG" + EXT
+    # lang_out_path = os.path.join(WHISPER_DATA, file_name) + "-LANG" + EXT
     audio = load_audio(in_path)
     np.save(out_path, audio)
-    np.save(lang_out_path, audio[:N_SAMPLES])
-    job_lang = single_queue.enqueue(detect_language, lang_out_path, user, task_id)
+    # np.save(lang_out_path, audio[:N_SAMPLES])
+    # job_lang = single_queue.enqueue(detect_language, lang_out_path, user, task_id)
     job_split_audio = single_queue.enqueue(
         detect_voice_segments, out_path, user, task_id
     )
-    job_merge = single_queue.enqueue(
-        merge_jobs, job_lang.id, job_split_audio.id, user, task_id
-    )
+    # job_merge = single_queue.enqueue(
+    #    merge_jobs, job_lang.id, job_split_audio.id, user, task_id
+    # )
 
     response = {
         "complete_data_output_path": out_path,
-        "language_data_output_pat": lang_out_path,
-        "language_detection_job_id": job_lang.id,
+        # "language_data_output_pat": lang_out_path,
+        # "language_detection_job_id": job_lang.id,
         "voice_detection_job_id": job_split_audio.id,
-        "merge_step_job_id": job_merge.id,
+        # "merge_step_job_id": job_merge.id,
         "user": user,
         "task_id": task_id,
         "task_type": "conver_to_numpy",
     }
 
-    rq_connection.publish(single, json.dump(response))
+    rq_connection.publish(single, json.dumps(response))
     return response

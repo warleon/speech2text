@@ -4,7 +4,7 @@ import { FileJob, FileJobStatus, Segment } from "@/types/job";
 import { useCallback, useMemo, useEffect } from "react";
 import { usePersistentId } from "./usePersistentId";
 import { usePersistentJobs } from "./usePersistendJobs";
-import { FILE_KEY, FILE_NAME_KEY, USER_KEY } from "@/lib/constants";
+import { FILE_KEY, FILE_NAME_KEY, TASK_KEY, USER_KEY } from "@/lib/constants";
 import { useBackendSubscription } from "./useBackendSubscription";
 import axios from "axios";
 
@@ -165,6 +165,7 @@ export function useFileJobs(
       formData.append(FILE_KEY, job.file);
       formData.append(FILE_NAME_KEY, job.id);
       formData.append(USER_KEY, userId);
+      formData.append(TASK_KEY, id);
 
       const tick = progressJob(id, "uploading");
       try {

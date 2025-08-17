@@ -23,7 +23,8 @@ def hello():
 def dispatch():
     file_name = request.args["file"]
     user = request.args["user"]
-    job = single_queue.enqueue(convert_to_numpy, file_name, user)
+    task_id = request.args["task"]
+    job = single_queue.enqueue(convert_to_numpy, file_name, user, task_id)
     return jsonify({"job_id": job.id})
 
 

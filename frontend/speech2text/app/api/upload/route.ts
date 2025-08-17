@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { writeFile } from "fs/promises";
 import path from "path";
-import { FILE_KEY, FILE_NAME_KEY, USER_KEY } from "@/lib/constants";
+import { FILE_KEY, FILE_NAME_KEY, TASK_KEY, USER_KEY } from "@/lib/constants";
 import axios from "axios";
 
 const uploadDir = path.join(process.cwd(), "uploads");
@@ -12,6 +12,7 @@ export async function POST(req: Request) {
     const file = formData.get(FILE_KEY) as File | null;
     const file_name = formData.get(FILE_NAME_KEY) as string | null;
     const user = formData.get(USER_KEY) as string | null;
+    const task = formData.get(TASK_KEY) as string | null;
 
     if (!file || !file_name) {
       return NextResponse.json(
@@ -35,6 +36,7 @@ export async function POST(req: Request) {
         params: {
           file: file_name,
           user: user,
+          task: task,
         },
       }
     );
