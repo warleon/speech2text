@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Install system dependencies in one layer and clean up
 RUN apt-get update && \
-    apt-get install -y ffmpeg curl && \
+    apt-get install -y ffmpeg curl patch && \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -14,13 +14,20 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt &&\
     pip install --no-cache-dir transformers -U
 
+COPY patches patches
+RUN patch /usr/local/lib/python3.8/dist-packages/rq/intermediate_queue.py < ./patches/intermediate_queue.patch
+
 COPY models.py .
 
 # Pass Hugging Face token as build arg and set as env
 ARG HUGGING_FACE_TOKEN
-ENV HUGGING_FACE_TOKEN=${HUGGING_FACE_TOKEN}
 ARG MODELS_DOWNLOAD_PATH
+
+ENV HUGGING_FACE_TOKEN=${HUGGING_FACE_TOKEN}
 ENV MODELS_DOWNLOAD_PATH=${MODELS_DOWNLOAD_PATH}
+ENV TORCH_HOME="${MODELS_DOWNLOAD_PATH}/torch"
+ENV XDG_CACHE_HOME="${MODELS_DOWNLOAD_PATH}/xdg"
+ENV PYANNOTE_CACHE="${MODELS_DOWNLOAD_PATH}/pyannote"
 
 # Download model at build time
 RUN python3 models.py

@@ -41,6 +41,7 @@ default_asr_options = faster_whisper.transcribe.TranscriptionOptions(
     }
 )
 
+# Vad model alrady locally available, downloaded alongside whisperx
 vad_model = load_vad_model(
     torch.device("cpu"), use_auth_token=HUGGING_FACE_TOKEN, **default_vad_options
 )
