@@ -5,6 +5,7 @@ from pubsub import pubsub_listener
 from tasks import convert_to_numpy
 from worker import start_workers
 import threading
+import multiprocessing
 
 # todo remove hypercorn from the requirements
 
@@ -24,7 +25,9 @@ def dispatch():
     file_name = request.args["file"]
     user = request.args["user"]
     task_id = request.args["task"]
-    job = single_queue.enqueue(convert_to_numpy, file_name, user, task_id)
+    job = single_queue.enqueue(
+        convert_to_numpy, file_name, user, task_id, job_timeout=-1
+    )
     return jsonify({"job_id": job.id})
 
 
@@ -44,6 +47,10 @@ def websocket(conn):
 
 
 if __name__ == "__main__":
-    threading.Thread(target=pubsub_listener, args=[connections], daemon=True).start()
+    ps_thread = threading.Thread(
+        target=pubsub_listener, args=[connections], daemon=True
+    )
     start_workers()
+    ps_thread.start()
     app.run(debug=True, host="0.0.0.0", port=8000)
+    ps_thread.join()

@@ -8,10 +8,12 @@ def pubsub_listener(connections: dict):
     for msg in ps.listen():
         if msg["type"] == "message":
             raw = msg["data"]
-            data = json.load(msg["data"])
+            data = json.loads(msg["data"])
             user = data["user"]
-            conn = connections[user]
             try:
+                conn = connections[user]
                 conn.send(raw)
+            except KeyError:
+                print("Websocket connection for", user, "not found")
             except Exception:
                 connections.pop(user)

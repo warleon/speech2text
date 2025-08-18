@@ -7,7 +7,7 @@ from whisperx.vad import merge_chunks
 from models import vad_model, whisper_model, tokenizer, default_asr_options
 import numpy as np
 from queues import single, single_queue, rq_connection
-from rq.job import Job
+from rq import Retry
 import json
 
 
@@ -55,35 +55,77 @@ def transcribe_segment(
 #    return response
 
 
-def detect_voice_segments(file_name: str, user: str, task_id: str):
-    audio = np.load(file_name)
-    vad_segments = vad_model(
-        {"waveform": torch.from_numpy(audio).unsqueeze(0), "sample_rate": SAMPLE_RATE}
-    )
-    chunks = merge_chunks(vad_segments, CHUNK_LENGTH)
-    timestamps = [(chunk["start"], chunk["end"]) for chunk in chunks]
-    split_audio = [
-        audio[int(s * SAMPLE_RATE) : int(e * SAMPLE_RATE)] for s, e in timestamps
-    ]
-    total = len(split_audio)
-    out_paths = [
-        os.path.join(WHISPER_DATA, str(i) + str(total) + file_name)
-        for i in range(total)
-    ]
-    for op, sa, (s, e) in zip(out_paths, split_audio, timestamps):
-        np.save(op, sa)
-        single_queue.enqueue(transcribe_segment, op, s, e, user, task_id)
+def detect_voice_segments(file_path: str, user: str, task_id: str):
+    with open(os.path.join(UPLOADS, "detect_voice_segments_output.txt"), "w") as f:
+        try:
+            print("EXECUTING TASK detect_voice_segments", file=f, flush=True)
+            audio = np.load(file_path)
+            print("on detect_voice_segments loaded audio file", file=f, flush=True)
+            file_name = os.path.basename(file_path)
+            # print("on detect_voice_segments start processing audio", file=f, flush=True)
+            # vad_segments = vad_model(
+            #    {
+            #        "waveform": torch.from_numpy(audio).unsqueeze(0),
+            #        "sample_rate": SAMPLE_RATE,
+            #    }
+            # )
+            # print("on detect_voice_segments done processing audio", file=f, flush=True)
+            # print(
+            #    "on detect_voice_segments start organizing chunks", file=f, flush=True
+            # )
+            # chunks = merge_chunks(vad_segments, CHUNK_LENGTH)
+            # timestamps = [(chunk["start"], chunk["end"]) for chunk in chunks]
+            # split_audio = [
+            #    audio[int(s * SAMPLE_RATE) : int(e * SAMPLE_RATE)]
+            #    for s, e in timestamps
+            # ]
+            # total = len(split_audio)
+            # out_paths = [
+            #    os.path.join(WHISPER_DATA, str(i) + str(total) + file_name)
+            #    for i in range(total)
+            # ]
+            # print("on detect_voice_segments done organizing chunks", file=f, flush=True)
+            # print(
+            #    "on detect_voice_segments start saving and dispatching segments",
+            #    file=f,
+            #    flush=True,
+            # )
+            # for op, sa, (s, e) in zip(out_paths, split_audio, timestamps):
+            #    np.save(op, sa)
+            #    single_queue.enqueue(
+            #        transcribe_segment, op, s, e, user, task_id, job_timeout=-1
+            #    )
+            # print(
+            #    "on detect_voice_segments done saving and dispatching segments",
+            #    file=f,
+            #    flush=True,
+            # )
 
-    response = {
-        "segments_output_paths": out_paths,
-        "segments_timestamps": timestamps,
-        "user": user,
-        "task_id": task_id,
-        "task_type": "detect_voice_segments",
-    }
+            response = {
+                # "segments_output_paths": out_paths,
+                # "segments_timestamps": timestamps,
+                "user": user,
+                "task_id": task_id,
+                "task_type": "detect_voice_segments",
+            }
 
-    rq_connection.publish(single, json.dumps(response))
-    return response
+        except Exception as e:
+            response = {"error": e}
+            print(
+                "failed to run due to exception",
+                json.dumps(response),
+                file=f,
+                flush=True,
+            )
+        finally:
+            print(
+                "done running detect_voice_segments",
+                json.dumps(response),
+                file=f,
+                flush=True,
+            )
+            rq_connection.publish(single, json.dumps(response))
+            return response
 
 
 # def merge_jobs(job_a_id, job_b_id, user: str, task_id: str):
@@ -121,7 +163,11 @@ def convert_to_numpy(file_name: str, user: str, task_id: str):
     # np.save(lang_out_path, audio[:N_SAMPLES])
     # job_lang = single_queue.enqueue(detect_language, lang_out_path, user, task_id)
     job_split_audio = single_queue.enqueue(
-        detect_voice_segments, out_path, user, task_id
+        detect_voice_segments,
+        out_path,
+        user,
+        task_id,
+        job_timeout=-1,
     )
     # job_merge = single_queue.enqueue(
     #    merge_jobs, job_lang.id, job_split_audio.id, user, task_id
@@ -131,7 +177,7 @@ def convert_to_numpy(file_name: str, user: str, task_id: str):
         "complete_data_output_path": out_path,
         # "language_data_output_pat": lang_out_path,
         # "language_detection_job_id": job_lang.id,
-        "voice_detection_job_id": job_split_audio.id,
+        # "voice_detection_job_id": job_split_audio.id,
         # "merge_step_job_id": job_merge.id,
         "user": user,
         "task_id": task_id,
