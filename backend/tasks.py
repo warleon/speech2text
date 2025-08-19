@@ -18,8 +18,8 @@ def transcribe_segment(
 ):
     audio = np.load(segment_path)
     ai = AIWorker()
-    text = ai.get_transcription(audio)
-    result = {"text": text, "start": start_time_s, "end": end_time_s}
+    segments = ai.get_transcription(audio)
+    result = {"segments": list(segments), "start": start_time_s, "end": end_time_s}
     response = {
         "transcription": result,
         "user": user,
@@ -28,6 +28,7 @@ def transcribe_segment(
         "segment_path": segment_path,
     }
     notify(response)
+    return response
 
 
 # TODO think on how to integrate this
@@ -74,6 +75,7 @@ def detect_voice_segments(file_path: str, user: str, task_id: str):
         response = {"error": e}
     finally:
         notify(response)
+        return response
 
 
 # def merge_jobs(job_a_id, job_b_id, user: str, task_id: str):
@@ -130,3 +132,4 @@ def convert_to_numpy(file_name: str, user: str, task_id: str):
     }
 
     notify(response)
+    return response

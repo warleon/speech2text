@@ -134,13 +134,16 @@ class AIWorker:
         if not self.default_asr_options:
             raise ValueError("AIWorker.default_asr_options has not been initialized")
         model_n_mels = self.whisper_model.feat_kwargs.get("feature_size")
+        logger.info("Transcribing audio of shape %s", audio.shape)
         features = log_mel_spectrogram(
             audio,
             n_mels=model_n_mels if model_n_mels is not None else 80,
             padding=N_SAMPLES - audio.shape[0],
         )
-        self.whisper_model.generate_segment_batched(
-            features, self.tokenizer, self.default_asr_options
+        logger.info("Audio features shape %s", features.shape)
+
+        return self.whisper_model.generate_segment_batched(
+            features.unsqueeze(0), self.tokenizer, self.default_asr_options
         )
 
     @cached_property
