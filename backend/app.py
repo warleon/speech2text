@@ -5,7 +5,7 @@ from pubsub import pubsub_listener
 from tasks import convert_to_numpy
 from worker import start_workers
 import threading
-from models import logger
+from models import logger, AIWorker
 
 # todo remove hypercorn from the requirements
 
@@ -46,6 +46,8 @@ def websocket(conn):
 
 
 if __name__ == "__main__":
+    models = AIWorker()
+    models.load_models()
     ps_thread = threading.Thread(
         target=pubsub_listener, args=[connections], daemon=True
     )

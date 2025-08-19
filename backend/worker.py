@@ -12,7 +12,6 @@ def start_workers():
             task()
             logger.info("Executed task %s", task)
         except Exception as e:
-            logger.error("Error on task %s: %s", task)
-            logger.error(e)
+            logger.error("Error on task %s: %s", task, str(e))
         finally:
             done()
