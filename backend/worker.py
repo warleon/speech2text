@@ -1,18 +1,18 @@
-from rq.worker_pool import WorkerPool
-from rq.worker import SimpleWorker, Worker
-from rq.serializers import JSONSerializer
-from queues import rq_connection, single_queue
-from rq import intermediate_queue
-from redis import _parsers
-
-
-workers = WorkerPool(
-    queues=[single_queue],
-    connection=rq_connection,
-    num_workers=1,
-    worker_class=Worker,
-)
+from queues import dequeue
+from models import logger
 
 
 def start_workers():
-    workers.start_workers(burst=False, logging_level="DEBUG")
+    logger.info("Spinning up working thread")
+    while True:
+        try:
+            logger.info("Waiting for task to be added to the queue")
+            task, done = dequeue()
+            logger.info("Executing task %s", task)
+            task()
+            logger.info("Executed task %s", task)
+        except Exception as e:
+            logger.error("Error on task %s: %s", task)
+            logger.error(e)
+        finally:
+            done()

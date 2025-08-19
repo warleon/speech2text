@@ -1,9 +1,17 @@
-from redis import Redis
-from rq import Queue
+from queue import Queue
+from typing import Callable
+from functools import partial
+from models import logger
 
-rq_connection = Redis(host="rq-server", port=6379)
+single_queue = Queue()
 
 
-single = "single"
+def enqueue(func: Callable[..., object], *args, **kwargs):
+    single_queue.put((func, args, kwargs))
+    logger.info("Enqueued task %s", func.__name__)
 
-single_queue = Queue(single, connection=rq_connection)
+
+def dequeue():
+    func, args, kwargs = single_queue.get()
+    logger.info("Dequeued task %s", func.__name__)
+    return partial(func, *args, **kwargs), single_queue.task_done

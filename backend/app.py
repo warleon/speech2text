@@ -1,11 +1,11 @@
 from flask import Flask, request, jsonify
 from flask_sock import Sock
-from queues import single_queue
+from queues import enqueue
 from pubsub import pubsub_listener
 from tasks import convert_to_numpy
 from worker import start_workers
 import threading
-import multiprocessing
+from models import logger
 
 # todo remove hypercorn from the requirements
 
@@ -25,10 +25,9 @@ def dispatch():
     file_name = request.args["file"]
     user = request.args["user"]
     task_id = request.args["task"]
-    job = single_queue.enqueue(
-        convert_to_numpy, file_name, user, task_id, job_timeout=-1
-    )
-    return jsonify({"job_id": job.id})
+    logger.info("Enqueuing %s task", convert_to_numpy.__name__)
+    enqueue(convert_to_numpy, file_name, user, task_id)
+    return jsonify({"status": "enqueued"}), 200
 
 
 @webSocket.route("/ws")
@@ -50,7 +49,9 @@ if __name__ == "__main__":
     ps_thread = threading.Thread(
         target=pubsub_listener, args=[connections], daemon=True
     )
-    start_workers()
+    worker_thread = threading.Thread(target=start_workers, args=[], daemon=True)
+    worker_thread.start()
     ps_thread.start()
     app.run(debug=True, host="0.0.0.0", port=8000)
     ps_thread.join()
+    worker_thread.join()
