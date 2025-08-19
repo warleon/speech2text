@@ -17,7 +17,8 @@ def transcribe_segment(
     segment_path: str, start_time_s: float, end_time_s: float, user: str, task_id: str
 ):
     audio = np.load(segment_path)
-    text = AIWorker.get_transcription(audio)
+    ai = AIWorker()
+    text = ai.get_transcription(audio)
     result = {"text": text, "start": start_time_s, "end": end_time_s}
     response = {
         "transcription": result,

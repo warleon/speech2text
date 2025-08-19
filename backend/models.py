@@ -11,6 +11,8 @@ import threading
 import numpy as np
 import logging
 from logging import DEBUG
+from faster_whisper.tokenizer import _LANGUAGE_CODES, _TASKS, Tokenizer
+from functools import cached_property
 
 logging.basicConfig(level=logging.NOTSET)
 
@@ -23,7 +25,7 @@ class AIWorker:
     _lock = threading.Lock()
     whisper_model = None
     vad_model = None
-    tokenizer = None
+    base_tokenizer = None
     default_asr_options = faster_whisper.transcribe.TranscriptionOptions(
         **{
             "beam_size": 5,
@@ -83,7 +85,7 @@ class AIWorker:
 
     @classmethod
     def _load_tokenizer(cls, token: str):
-        cls.tokenizer = tokenizers.Tokenizer.from_pretrained(
+        cls.base_tokenizer = tokenizers.Tokenizer.from_pretrained(
             "openai/whisper-tiny", "main", token
         )
 
@@ -100,7 +102,7 @@ class AIWorker:
     def load_models(cls):
         with cls._lock:
             token, cache_root = cls._get_env_vars()
-            if not cls.tokenizer:
+            if not cls.base_tokenizer:
                 cls._load_tokenizer(token)
             if not cls.vad_model:
                 cls._load_vad(token)
@@ -124,25 +126,33 @@ class AIWorker:
         logger.info("Perform segment merging")
         return merge_chunks(segments, CHUNK_LENGTH)
 
-    @classmethod
-    def get_transcription(cls, audio: np.ndarray):
-        if not cls.whisper_model:
+    def get_transcription(self, audio: np.ndarray):
+        if not self.whisper_model:
             raise ValueError("AIWorker.whisper_model has not been initialized")
-        if not cls.tokenizer:
-            raise ValueError("AIWorker.tokenizer has not been initialized")
-        if not cls.default_asr_options:
+        if not self.base_tokenizer:
+            raise ValueError("AIWorker.base_tokenizer has not been initialized")
+        if not self.default_asr_options:
             raise ValueError("AIWorker.default_asr_options has not been initialized")
-        model_n_mels = cls.whisper_model.feat_kwargs.get("feature_size")
+        model_n_mels = self.whisper_model.feat_kwargs.get("feature_size")
         features = log_mel_spectrogram(
             audio,
             n_mels=model_n_mels if model_n_mels is not None else 80,
             padding=N_SAMPLES - audio.shape[0],
         )
-        cls.whisper_model.generate_segment_batched(
-            features, cls.tokenizer, cls.default_asr_options
+        self.whisper_model.generate_segment_batched(
+            features, self.tokenizer, self.default_asr_options
         )
 
-    def __init__(self):
+    @cached_property
+    def tokenizer(self):
+        if not self.base_tokenizer:
+            raise ValueError("AIWorker.base_tokenizer has not been initialized")
+        if not self.lang:
+            raise ValueError("AIWorker.lang has not been initialized")
+        return Tokenizer(self.base_tokenizer, True, "transcribe", self.lang)
+
+    def __init__(self, lang="en"):
+        self.lang = lang
         self.load_models()
 
 
