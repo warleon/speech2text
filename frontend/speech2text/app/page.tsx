@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Copy } from "lucide-react";
 import { Dropzone } from "@/components/ui/dropzone";
 import { useFileJobs } from "@/hooks/useFileJobs";
+import { CircularProgress } from "@/components/ui/circularProgress";
 
 export default function WhisperS2TPage() {
   const { addFiles, jobs, removeJob } = useFileJobs();
@@ -111,14 +112,14 @@ export default function WhisperS2TPage() {
                             <span className="capitalize">{job.status}</span>
                             <span>{Math.round(job.progress)}%</span>
                           </div>
-                          <Progress
+                          <CircularProgress
                             value={job.progress}
-                            className="h-2"
-                            style={{
-                              // style progress bar color via CSS variable fallback
-                              // you can also customize your shadcn theme for a cleaner approach
-                              ["--progress-foreground" as any]: job.color,
-                            }}
+                            //className="h-2"
+                            //style={{
+                            //  // style progress bar color via CSS variable fallback
+                            //  // you can also customize your shadcn theme for a cleaner approach
+                            //  ["--progress-foreground" as any]: job.color,
+                            //}}
                           />
                         </div>
                       )}

@@ -10,6 +10,7 @@ import {
 import { useEffect, useMemo } from "react";
 import useWebSocket from "react-use-websocket";
 import { useWindow } from "./useWindow";
+import { data } from "framer-motion/client";
 
 interface Props {
   user: string;
@@ -28,10 +29,13 @@ export function useBackendSubscription({ user, on }: Props) {
     const host = "localhost:8000";
     return `ws://${host}/ws?user=${user}`; //TODO: should be url sanitized
   }, [user /*window*/]);
-  const { lastJsonMessage } = useWebSocket<backendResponse | null>(
-    connectionString
-  );
-  console.log(lastJsonMessage);
+  const { lastMessage } = useWebSocket(connectionString);
+  const lastJsonMessage = useMemo(() => {
+    if (lastMessage?.data) {
+      return JSON.parse(lastMessage?.data) as backendResponse;
+    }
+    return null;
+  }, [lastMessage]);
   useEffect(() => {
     switch (lastJsonMessage?.task_type) {
       case "convert_to_numpy":

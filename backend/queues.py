@@ -39,7 +39,8 @@ def process_queues(connections: Dict[str, Any]):
             task = dequeue(q)
             logger.info("Executing task %s", task)
             result = task()
-            logger.info("Result: %s", json.dumps(result, indent=2))
+            jsonResult = json.dumps(result)
+            logger.info("Result: %s", jsonResult)
             try:
                 user = result["user"]
                 task_type = result["task_type"]
@@ -48,7 +49,8 @@ def process_queues(connections: Dict[str, Any]):
                     raise ConnectionError(
                         f"Error notifying user {user} about task {task_type}, connection not stablished",
                     )
-                conn.send(result)
+                logger.info("Sending %s to the user %s", jsonResult, user)
+                conn.send(jsonResult)
             except Exception as e:
                 logger.exception(e)
         except Empty:

@@ -10,6 +10,8 @@ export type FileJobStatus =
   | "uploading"
   | "uploaded"
   | "processing"
+  | "detecting language"
+  | "transcribing"
   | "done"
   | "error";
 
