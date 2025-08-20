@@ -50,8 +50,7 @@ def detect_voice_segments(file_path: str, lang: str, user: str, task_id: str):
         ]
         total = len(split_audio)
         out_paths = [
-            os.path.join(WHISPER_DATA, str(i) + str(total) + file_name)
-            for i in range(total)
+            os.path.join(WHISPER_DATA, f"{i}_{total}_{file_name}") for i in range(total)
         ]
         total_time = sum([e - s for s, e in timestamps])
         for op, sa, (s, e) in zip(out_paths, split_audio, timestamps):
