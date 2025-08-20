@@ -6,8 +6,6 @@ import threading
 from models import logger, AIModels
 from typing import Dict, Any
 
-# todo remove hypercorn from the requirements
-
 
 app = Flask(__name__)
 webSocket = Sock(app)
