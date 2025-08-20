@@ -19,6 +19,7 @@ import { Copy } from "lucide-react";
 import { Dropzone } from "@/components/ui/dropzone";
 import { useFileJobs } from "@/hooks/useFileJobs";
 import { CircularProgress } from "@/components/ui/circularProgress";
+import { backend_status } from "@/types/job";
 
 export default function WhisperS2TPage() {
   const { addFiles, jobs, removeJob } = useFileJobs();
@@ -90,7 +91,7 @@ export default function WhisperS2TPage() {
                         </span>
                       </CardTitle>
                       <div className="flex items-center gap-2">
-                        {job.status === "done" && (
+                        {job.done && (
                           <CheckCircle
                             className="h-5 w-5"
                             style={{ color: job.color }}
@@ -106,31 +107,38 @@ export default function WhisperS2TPage() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      {job.status !== "done" && job.status !== "error" && (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span className="capitalize">{job.status}</span>
-                            <span>{Math.round(job.progress)}%</span>
-                          </div>
-                          <CircularProgress
-                            value={job.progress}
-                            //className="h-2"
-                            //style={{
-                            //  // style progress bar color via CSS variable fallback
-                            //  // you can also customize your shadcn theme for a cleaner approach
-                            //  ["--progress-foreground" as any]: job.color,
-                            //}}
-                          />
+                      {!job.done && !job.error && (
+                        <div className="space-y-2 flex justify-around flex-wrap">
+                          {(
+                            [
+                              "uploading",
+                              "processing",
+                              "detecting_language",
+                              "fragmenting",
+                              "transcribing",
+                            ] as backend_status[]
+                          ).map((key) => (
+                            <CircularProgress
+                              key={key}
+                              value={Math.round(job.status[key])}
+                              color={job.color}
+                              activated={
+                                job.status[key] > 0 && !Boolean(job.error)
+                              }
+                              action={key}
+                              size={120}
+                            />
+                          ))}
                         </div>
                       )}
 
-                      {job.status === "error" && (
+                      {job.error && (
                         <p className="text-sm text-destructive">
                           {job.error || "Something went wrong"}
                         </p>
                       )}
 
-                      {job.status === "done" && job.result && (
+                      {job.done && job.result && (
                         <div
                           className="mt-2 overflow-x-auto rounded-xl border"
                           style={{ borderColor: job.color }}

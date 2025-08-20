@@ -16,14 +16,9 @@ export function usePersistentJobs(key: string) {
   }, [key]);
 
   useEffect(() => {
-    localStorage.setItem(
-      key,
-      JSON.stringify(
-        jobs.filter((j) => !["queued", "uploading"].includes(j.status))
-      )
-    );
+    console.log("JOBS:", jobs);
+    localStorage.setItem(key, JSON.stringify(jobs));
   }, [jobs, key]);
-  console.log("JOBS:", jobs);
 
   return { jobs, setJobs } as const;
 }

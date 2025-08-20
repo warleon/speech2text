@@ -17,18 +17,25 @@ def transcribe_segment(
     lang: str,
     start_time_s: float,
     end_time_s: float,
+    total_time: float,
     user: str,
     task_id: str,
 ):
     audio = np.load(segment_path)
-    segments = AIModels.get_transcription(audio, lang)
-    result = {"segments": list(segments), "start": start_time_s, "end": end_time_s}
+    text = AIModels.get_transcription(audio, lang)
+    result = {
+        "text": text,
+        "start": start_time_s,
+        "end": end_time_s,
+        "total_time": total_time,
+    }
     response = {
         "transcription": result,
         "user": user,
         "task_type": "transcribe_segment",
         "task_id": task_id,
         "segment_path": segment_path,
+        "next_task_type": "",
     }
     return response
 
@@ -47,18 +54,29 @@ def detect_voice_segments(file_path: str, lang: str, user: str, task_id: str):
             os.path.join(WHISPER_DATA, str(i) + str(total) + file_name)
             for i in range(total)
         ]
+        total_time = sum([e - s for e, s in timestamps])
         for op, sa, (s, e) in zip(out_paths, split_audio, timestamps):
             np.save(op, sa)
             enqueue(
-                transcription_queue, transcribe_segment, op, lang, s, e, user, task_id
+                transcription_queue,
+                transcribe_segment,
+                op,
+                lang,
+                s,
+                e,
+                total_time,
+                user,
+                task_id,
             )
 
         response = {
             "segments_output_paths": out_paths,
             "segments_timestamps": timestamps,
+            "total_useful_time": total_time,
             "user": user,
             "task_id": task_id,
             "task_type": "detect_voice_segments",
+            "next_task_type": "transcribe_segment",
         }
 
     except Exception as e:
@@ -81,8 +99,9 @@ def detect_language(file_path: str, user: str, task_id: str):
     response = {
         "detected_language": lang,
         "user": user,
-        "task_type": "detect_language",
         "task_id": task_id,
+        "task_type": "detect_language",
+        "next_task_type": "detect_voice_segments",
     }
     return response
 
@@ -104,6 +123,7 @@ def convert_to_numpy(file_name: str, user: str, task_id: str):
         "user": user,
         "task_id": task_id,
         "task_type": "conver_to_numpy",
+        "next_task_type": "detect_language",
     }
 
     return response

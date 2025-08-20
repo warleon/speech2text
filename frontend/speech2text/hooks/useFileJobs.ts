@@ -1,40 +1,25 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { randomColor } from "@/lib/utils";
-import { FileJob, FileJobStatus, Segment } from "@/types/job";
+import { backend_status, FileJob } from "@/types/job";
 import { useCallback, useMemo, useEffect } from "react";
 import { usePersistentId } from "./usePersistentId";
 import { usePersistentJobs } from "./usePersistendJobs";
 import { FILE_KEY, FILE_NAME_KEY, TASK_KEY, USER_KEY } from "@/lib/constants";
 import { useBackendSubscription } from "./useBackendSubscription";
 import axios from "axios";
+import { segment } from "@/types/backend";
 
 interface Props {
   fakeProgressDuration: number;
 }
 
 export function useFileJobs(
-  { fakeProgressDuration }: Props = { fakeProgressDuration: 10000 }
+  { fakeProgressDuration }: Props = { fakeProgressDuration: 30000 }
 ) {
   const { jobs, setJobs } = usePersistentJobs("jobs");
   const userId = usePersistentId("userId");
-  const logIt = useCallback((m: unknown) => {
-    console.log(m);
-  }, []);
-  useBackendSubscription({
-    user: userId,
-    on: {
-      languageFound: logIt,
-      merge: logIt,
-      preProcess: logIt,
-      segmentation: logIt,
-      transcription: logIt,
-    },
-  });
 
-  const canStart = useMemo(
-    () => jobs.some((j) => j.status === "queued"),
-    [jobs]
-  );
+  const canStart = useMemo(() => jobs.some((j) => j.queued), [jobs]);
   const restoreJob = useCallback(
     (id: string, file?: File) => {
       setJobs((prev) =>
@@ -43,7 +28,6 @@ export function useFileJobs(
             ? {
                 ...j,
                 removed: false,
-                status: j.status === "error" ? "queued" : j.status,
                 file: file ?? j.file,
                 fileSize: file?.size
                   ? `${(file.size / (1024 * 1024)).toLocaleString()} MB`
@@ -71,6 +55,102 @@ export function useFileJobs(
     },
     [setJobs]
   );
+  const errorJob = useCallback(
+    (id: string, error: string) => {
+      setJobs((prev) =>
+        prev.map((j) => {
+          return j.id === id
+            ? {
+                ...j,
+                error: error,
+              }
+            : j;
+        })
+      );
+    },
+    [setJobs]
+  );
+
+  const sentJob = useCallback(
+    (id: string) => {
+      setJobs((prev) =>
+        prev.map((j) => {
+          return j.id === id
+            ? {
+                ...j,
+                sent: true,
+                status: {
+                  ...j.status,
+                  uploading: 100,
+                },
+              }
+            : j;
+        })
+      );
+    },
+    [setJobs]
+  );
+
+  const doneJob = useCallback(
+    (id: string) => {
+      setJobs((prev) =>
+        prev.map((j) => {
+          return j.id === id
+            ? {
+                ...j,
+                done: true,
+                status: {
+                  detecting_language: 100,
+                  fragmenting: 100,
+                  processing: 100,
+                  transcribing: 100,
+                  uploading: 100,
+                },
+              }
+            : j;
+        })
+      );
+    },
+    [setJobs]
+  );
+
+  const addResult = useCallback(
+    (id: string, segment: segment) => {
+      setJobs((prev) =>
+        prev.map((j) => {
+          return j.id === id
+            ? {
+                ...j,
+                result: j.result ? [...j.result, segment] : [segment],
+              }
+            : j;
+        })
+      );
+    },
+    [setJobs]
+  );
+  const setStatus = useCallback(
+    (id: string, status: backend_status, value: number) => {
+      setJobs((prev) =>
+        prev.map((j) => {
+          if (j.id === id) {
+            if (j.error) return j;
+            if (j.status[status] >= value) return j;
+            return {
+              ...j,
+              status: {
+                ...j.status,
+                [status]: value > 100 ? 100 : value < 0 ? 0 : value,
+              },
+            };
+          } else {
+            return j;
+          }
+        })
+      );
+    },
+    [setJobs]
+  );
 
   const addFiles = useCallback(
     (files: FileList | null) => {
@@ -81,7 +161,7 @@ export function useFileJobs(
         const id = `${f.name}-${f.size}-${f.lastModified}-${userId}`;
         const alreadyJob = jobs.find((j) => j.id === id);
         if (alreadyJob) {
-          if (alreadyJob.removed || alreadyJob.status === "error")
+          if (alreadyJob.removed || alreadyJob.error)
             restoreJob(alreadyJob.id, f);
           return;
         }
@@ -91,8 +171,18 @@ export function useFileJobs(
           fileSize: `${(f.size / (1024 * 1024)).toLocaleString()} MB`,
           fileName: f.name,
           color: randomColor(f.name + f.size + ""),
-          progress: 0,
-          status: "queued",
+          queued: true,
+          done: false,
+          error: null,
+          removed: false,
+          sent: false,
+          status: {
+            detecting_language: 0,
+            processing: 0,
+            transcribing: 0,
+            uploading: 0,
+            fragmenting: 0,
+          },
         } satisfies FileJob);
       });
       if (items.length) setJobs((prev) => [...prev, ...items]);
@@ -100,31 +190,7 @@ export function useFileJobs(
     [setJobs, userId, jobs, restoreJob]
   );
   const progressJob = useCallback(
-    (
-      id: string,
-      status: FileJobStatus,
-      pastTick?: NodeJS.Timeout,
-      done?: boolean,
-      error?: string | null,
-      result?: Segment[]
-    ) => {
-      if (pastTick) clearInterval(pastTick);
-      if (done || error) {
-        setJobs((prev) =>
-          prev.map((j) =>
-            j.id === id
-              ? {
-                  ...j,
-                  progress: error ? 0 : 100,
-                  status,
-                  error,
-                  result,
-                }
-              : j
-          )
-        );
-        return;
-      }
+    (id: string, status: backend_status, limit: number = 99) => {
       // "Fake" progress while waiting for server response
       const startTime = Date.now();
       const tick = setInterval(() => {
@@ -133,28 +199,44 @@ export function useFileJobs(
 
         if (t >= 1) t = 1;
 
-        const progress = easeInOutCubic(t) * 99; // scale to 99%
+        const progress = easeInOutCubic(t) * limit;
+        setStatus(id, status, progress);
 
-        setJobs((prev) =>
-          prev.map((j) =>
-            j.id === id
-              ? {
-                  ...j,
-                  progress,
-                  status,
-                }
-              : j
-          )
-        );
-
-        if (t >= 1) {
+        if (progress >= limit || progress >= 99) {
           clearInterval(tick);
         }
       }, 500);
       return tick;
     },
-    [fakeProgressDuration, setJobs]
+    [fakeProgressDuration, setStatus]
   );
+  useBackendSubscription({
+    user: userId,
+    on: {
+      preProcess: (task) => {
+        setStatus(task.task_id, "processing", 100);
+        progressJob(task.task_id, "detecting_language", 99);
+      },
+      languageFound: (task) => {
+        setStatus(task.task_id, "detecting_language", 100);
+        progressJob(task.task_id, "fragmenting", 99);
+      },
+      segmentation: (task) => {
+        setStatus(task.task_id, "fragmenting", 100);
+        setStatus(task.task_id, "transcribing", 1);
+      },
+      transcription: (task) => {
+        const currentProgress = jobs.find((j) => j.id === task.task_id)!.status
+          .transcribing;
+        const diff = task.transcription.end - task.transcription.start;
+        const total = task.transcription.total_time;
+        const newTotal = currentProgress + diff / total;
+        setStatus(task.task_id, "transcribing", newTotal);
+        addResult(task.task_id, task.transcription);
+        if (newTotal >= 100) doneJob(task.task_id);
+      },
+    },
+  });
 
   const runJob = useCallback(
     async (id: string) => {
@@ -167,27 +249,25 @@ export function useFileJobs(
       formData.append(USER_KEY, userId);
       formData.append(TASK_KEY, id);
 
-      const tick = progressJob(id, "uploading");
+      progressJob(id, "uploading", 99);
       try {
         const res = await axios.post("/api/upload", formData);
         console.log("BACKEND RESPONSE:", res);
-
-        progressJob(id, "uploaded", tick!, true, null);
       } catch (err: any) {
-        progressJob(id, "error", tick!, true, err.message);
+        errorJob(id, err.message);
       }
     },
-    [jobs, progressJob, userId]
+    [jobs, progressJob, userId, errorJob]
   );
 
   const start = useCallback(() => {
     // process each queued job sequentially for simplicity
     for (const job of jobs) {
-      if (job.status !== "queued") continue;
-      if (job.removed) continue;
+      if (job.removed || job.done || job.error || job.sent) continue;
       runJob(job.id);
+      sentJob(job.id);
     }
-  }, [jobs, runJob]);
+  }, [jobs, runJob, sentJob]);
 
   useEffect(() => {
     start();

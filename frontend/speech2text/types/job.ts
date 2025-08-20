@@ -1,29 +1,27 @@
 // Types returned by your Flask API
-export interface Segment {
-  start: number;
-  end: number;
-  text: string;
-  speaker: string;
-}
-export type FileJobStatus =
-  | "queued"
-  | "uploading"
-  | "uploaded"
-  | "processing"
-  | "detecting language"
-  | "transcribing"
-  | "done"
-  | "error";
+import { segment } from "@/types/backend";
 
-export interface FileJob {
+export type backend_status =
+  | "uploading"
+  | "processing"
+  | "detecting_language"
+  | "transcribing"
+  | "fragmenting";
+
+export type frontend_status = "queued" | "done" | "error" | "removed" | "sent";
+
+export type FileJobStatus = backend_status | frontend_status;
+
+export type FileJob = {
   id: string; // unique per file
   file: File;
   fileName: string;
   fileSize: string;
   color: string; // hsl string
-  progress: number; // 0..100
-  status: FileJobStatus;
-  error?: string | null;
-  result?: Segment[];
-  removed?: boolean;
-}
+  result?: segment[];
+  status: {
+    [key in backend_status]: number;
+  };
+} & {
+  [key in frontend_status]: boolean | string | null;
+};

@@ -2,75 +2,74 @@
 import * as React from "react";
 import { motion } from "framer-motion";
 
-// Reusable SVG-based circular progress with a centered inner circle for text/content
-// Works great alongside shadcn/ui. Drop it anywhere in your app.
-//
-// Props:
-// - value: number from 0 to 100
-// - size: overall square size in px
-// - thickness: stroke width of the outer progress ring
-// - trackClassName: Tailwind classes for the background track ring
-// - progressClassName: Tailwind classes for the animated progress ring
-// - innerClassName: Tailwind classes for the inner circle container
-// - roundedCaps: whether the ring ends should be rounded
-// - label: string | React.ReactNode – what's shown in the center (defaults to the % value)
-// - animateFrom: initial value for entry animation (default 0)
-// - duration: seconds for animation (default 1)
-// - ariaLabel: accessible label text
 export function CircularProgress({
-  value = 65,
+  value,
+  color,
   size = 180,
   thickness = 12,
-  trackClassName = "stroke-muted",
-  progressClassName = "stroke-primary",
-  innerClassName = "bg-background border border-border shadow-sm",
-  roundedCaps = true,
-  label,
-  animateFrom = 0,
   duration = 1,
-  ariaLabel = "Loading progress",
+  action = "Processing",
+  activated = true,
+  deactivatedColor = "hsl(220, 10%, 70%)",
 }: {
-  value?: number;
+  value: number;
   size?: number;
   thickness?: number;
-  trackClassName?: string;
-  progressClassName?: string;
-  innerClassName?: string;
-  roundedCaps?: boolean;
-  label?: React.ReactNode;
-  animateFrom?: number;
   duration?: number;
-  ariaLabel?: string;
+  action?: string;
+  color: string;
+  activated?: boolean;
+  deactivatedColor?: string;
 }) {
   const clamped = Math.max(0, Math.min(100, value));
   const radius = (size - thickness) / 2;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - clamped / 100);
-
-  // We rotate -90deg so progress starts at the top (12 o'clock)
   const center = size / 2;
 
+  const ringColor = activated ? color : deactivatedColor;
+  const textColor = activated ? "text-black" : "text-gray-400";
+
   return (
-    <div
+    <motion.div
       className="relative inline-block select-none"
       style={{ width: size, height: size }}
       role="img"
-      aria-label={`${ariaLabel}: ${clamped}%`}
+      aria-label={`Loading progress: ${clamped}%`}
     >
-      <svg
+      <motion.svg
         width={size}
         height={size}
         viewBox={`0 0 ${size} ${size}`}
-        className="block"
+        className="block overflow-visible"
         style={{ transform: "rotate(-90deg)" }}
       >
+        <defs>
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow
+              dx="0"
+              dy="0"
+              stdDeviation="4"
+              floodColor={color}
+              floodOpacity="0.8"
+            />
+            <feDropShadow
+              dx="0"
+              dy="0"
+              stdDeviation="10"
+              floodColor={color}
+              floodOpacity="0.6"
+            />
+          </filter>
+        </defs>
+
         {/* Track */}
         <circle
           cx={center}
           cy={center}
           r={radius}
-          className={trackClassName}
           fill="transparent"
+          stroke="hsl(220, 10%, 85%)"
           strokeWidth={thickness}
         />
         {/* Progress ring */}
@@ -78,42 +77,31 @@ export function CircularProgress({
           cx={center}
           cy={center}
           r={radius}
-          className={progressClassName}
           fill="transparent"
+          stroke={ringColor}
           strokeWidth={thickness}
-          strokeLinecap={roundedCaps ? "round" : "butt"}
+          strokeLinecap="round"
           strokeDasharray={circumference}
-          initial={{
-            strokeDashoffset:
-              circumference *
-              (1 - Math.max(0, Math.min(100, animateFrom)) / 100),
-          }}
+          initial={{ strokeDashoffset: circumference }}
           animate={{ strokeDashoffset: dashOffset }}
           transition={{ duration, ease: "easeInOut" }}
+          filter={activated ? "url(#glow)" : undefined}
         />
-      </svg>
+      </motion.svg>
 
       {/* Inner circle with centered content */}
-      <div
-        className={`absolute inset-[${
-          thickness * 1.15
-        }px] rounded-full flex items-center justify-center ${innerClassName}`}
-        style={{
-          inset: thickness * 1.15,
-        }}
+      <motion.div
+        className="absolute rounded-full flex items-center justify-center bg-white border shadow-sm"
+        style={{ inset: thickness * 1.15 }}
       >
-        <div className="text-center leading-tight">
-          {label ?? (
-            <>
-              <div className="text-3xl font-semibold tabular-nums">
-                {clamped}
-                <span className="opacity-70 text-lg">%</span>
-              </div>
-              <div className="text-xs text-muted-foreground">Processing</div>
-            </>
-          )}
+        <div className={`text-center leading-tight ${textColor}`}>
+          <div className="text-3xl font-semibold tabular-nums">
+            {clamped}
+            <span className="opacity-70 text-lg">%</span>
+          </div>
+          <div className="text-xs">{action}</div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
