@@ -12,7 +12,7 @@ import numpy as np
 import logging
 from logging import DEBUG
 from faster_whisper.tokenizer import _LANGUAGE_CODES, _TASKS, Tokenizer
-from functools import cached_property
+from typing import Dict, Any
 
 logging.basicConfig(level=logging.NOTSET)
 
@@ -21,11 +21,11 @@ logger = logging.getLogger(__name__)
 logger.setLevel(DEBUG)
 
 
-class AIWorker:
+class AIModels:
     _lock = threading.Lock()
-    whisper_model = None
-    vad_model = None
-    base_tokenizer = None
+    whisper_model: WhisperModel = None
+    vad_model: VoiceActivitySegmentation = None
+    base_tokenizer: tokenizers.Tokenizer = None
     default_asr_options = faster_whisper.transcribe.TranscriptionOptions(
         **{
             "beam_size": 5,
@@ -61,6 +61,8 @@ class AIWorker:
         "min_duration_off": 0.1,
     }
 
+    tokenizers: Dict[str, Tokenizer] = {}
+
     @classmethod
     def _get_env_vars(cls):
         HUGGING_FACE_TOKEN = os.environ.get("HUGGING_FACE_TOKEN")
@@ -81,10 +83,10 @@ class AIWorker:
         vad_pipeline = VoiceActivitySegmentation(
             segmentation=vad_model, device=torch.device("cpu")
         )
-        cls.vad_model = vad_pipeline.instantiate(AIWorker.vad_args)
+        cls.vad_model = vad_pipeline.instantiate(AIModels.vad_args)
 
     @classmethod
-    def _load_tokenizer(cls, token: str):
+    def _load_base_tokenizer(cls, token: str):
         cls.base_tokenizer = tokenizers.Tokenizer.from_pretrained(
             "openai/whisper-tiny", "main", token
         )
@@ -103,7 +105,7 @@ class AIWorker:
         with cls._lock:
             token, cache_root = cls._get_env_vars()
             if not cls.base_tokenizer:
-                cls._load_tokenizer(token)
+                cls._load_base_tokenizer(token)
             if not cls.vad_model:
                 cls._load_vad(token)
             if not cls.whisper_model:
@@ -126,14 +128,15 @@ class AIWorker:
         logger.info("Perform segment merging")
         return merge_chunks(segments, CHUNK_LENGTH)
 
-    def get_transcription(self, audio: np.ndarray):
-        if not self.whisper_model:
+    @classmethod
+    def get_transcription(cls, audio: np.ndarray, lang: str):
+        if not cls.whisper_model:
             raise ValueError("AIWorker.whisper_model has not been initialized")
-        if not self.base_tokenizer:
+        if not cls.base_tokenizer:
             raise ValueError("AIWorker.base_tokenizer has not been initialized")
-        if not self.default_asr_options:
+        if not cls.default_asr_options:
             raise ValueError("AIWorker.default_asr_options has not been initialized")
-        model_n_mels = self.whisper_model.feat_kwargs.get("feature_size")
+        model_n_mels = cls.whisper_model.feat_kwargs.get("feature_size")
         logger.info("Transcribing audio of shape %s", audio.shape)
         features = log_mel_spectrogram(
             audio,
@@ -142,24 +145,49 @@ class AIWorker:
         )
         logger.info("Audio features shape %s", features.shape)
 
-        return self.whisper_model.generate_segment_batched(
-            features.unsqueeze(0), self.tokenizer, self.default_asr_options
+        return cls.whisper_model.generate_segment_batched(
+            features.unsqueeze(0), cls.get_tokenizer(lang), cls.default_asr_options
         )
 
-    @cached_property
-    def tokenizer(self):
-        if not self.base_tokenizer:
+    @classmethod
+    def get_tokenizer(cls, lang: str):
+        if not cls.base_tokenizer:
             raise ValueError("AIWorker.base_tokenizer has not been initialized")
-        if not self.lang:
-            raise ValueError("AIWorker.lang has not been initialized")
-        return Tokenizer(self.base_tokenizer, True, "transcribe", self.lang)
+        if lang not in _LANGUAGE_CODES:
+            raise ValueError("Language is not supported by the AI model")
+        if not lang in cls.tokenizers:
+            cls.tokenizers[lang] = Tokenizer(
+                cls.base_tokenizer, True, "transcribe", lang
+            )
+        return cls.tokenizers[lang]
 
-    def __init__(self, lang="en"):
-        self.lang = lang
+    @classmethod
+    def get_language(cls, audio: np.ndarray):
+        if not cls.whisper_model:
+            raise ValueError("AIWorker.whisper_model has not been initialized")
+        if audio.shape[0] < N_SAMPLES:
+            logger.warning(
+                "Audio is shorter than 30s, language detection may be inaccurate."
+            )
+        segment = log_mel_spectrogram(
+            audio[:N_SAMPLES],
+            n_mels=80,
+            padding=0 if audio.shape[0] >= N_SAMPLES else N_SAMPLES - audio.shape[0],
+        )
+        encoder_output = cls.whisper_model.encode(segment)
+        results = cls.whisper_model.model.detect_language(encoder_output)
+        language_token, language_probability = results[0][0]
+        language = language_token[2:-2]
+        logger.info(
+            f"Detected language: {language} ({language_probability:.2f}) in first 30s of audio..."
+        )
+        return language
+
+    def __init__(self):
         self.load_models()
 
 
 # diarize_model = DiarizationPipeline(use_auth_token=HUGGING_FACE_TOKEN, device="cpu")
 
 if __name__ == "__main__":
-    AIWorker()
+    AIModels()

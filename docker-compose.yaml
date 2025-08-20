@@ -19,11 +19,11 @@ services:
       - 8000:8000
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
-      interval: 20s
-      timeout: 10s
+      interval: 30s
+      timeout: 30s
       retries: 10
   frontend:
-    build: ./frontend # Path to your Next.js frontend
+    build: ./frontend
     ports:
       - "3000:3000"
     networks:
@@ -35,19 +35,6 @@ services:
     volumes:
       - shared-uploads:/app/uploads
     command: npm run start
-  rq-dashboard:
-    image: jaredv/rq-docker:0.0.2
-    command: rq-dashboard -H rq-server
-    ports:
-      - 9181:9181
-    networks:
-      - whisper-net
-  rq-server:
-    image: redis:alpine
-    ports:
-      - 6379:6379
-    networks:
-      - whisper-net
 
 networks:
   whisper-net:
