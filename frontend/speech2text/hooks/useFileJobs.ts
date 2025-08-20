@@ -296,13 +296,14 @@ export function useFileJobs(
           doneJob(job.id);
           continue;
         }
+        setStatus(job.id, "transcribing", (sub_total / total) * 100);
       }
       if (job.sent) continue;
       runJob(job.id);
       sentJob(job.id);
       progressJob(job.id, "processing");
     }
-  }, [jobs, runJob, sentJob, progressJob, doneJob]);
+  }, [jobs, runJob, sentJob, progressJob, setStatus, doneJob]);
 
   useEffect(() => {
     process();
