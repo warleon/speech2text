@@ -1,7 +1,7 @@
 export interface segment {
   start: number;
   end: number;
-  text: string;
+  text: string[];
   total_time: number;
 }
 type task_type =

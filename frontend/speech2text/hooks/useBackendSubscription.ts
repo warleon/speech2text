@@ -9,6 +9,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import useWebSocket from "react-use-websocket";
 import { usePrevious } from "./usePrevious";
+import { json } from "stream/consumers";
 
 interface Props {
   user: string;
@@ -31,22 +32,14 @@ export function useBackendSubscription({
     return `ws://${host}/ws?user=${user}`; //TODO: should be url sanitized
   }, [user /*window*/]);
   const { lastMessage } = useWebSocket(connectionString);
-  const prevMessage = usePrevious(lastMessage?.data);
-  const isTheSame = useMemo(
-    () => lastMessage?.data === prevMessage,
-    [lastMessage, prevMessage]
-  );
-  const [lastJsonMessage, setLastJsonMessage] =
-    useState<backendResponse | null>(null);
+  const lastJsonMessage = useMemo(() => {
+    if (lastMessage?.data)
+      return JSON.parse(lastMessage.data) as backendResponse;
+    return null;
+  }, [lastMessage]);
+  const prev = usePrevious(lastJsonMessage);
   useEffect(() => {
-    if (lastMessage?.data) {
-      if (!isTheSame) setLastJsonMessage(JSON.parse(lastMessage?.data));
-    } else {
-      setLastJsonMessage(null);
-    }
-  }, [lastMessage, isTheSame]);
-  useEffect(() => {
-    if (isTheSame) return;
+    if (prev === lastJsonMessage) return;
     console.log("Last JSON message:", lastJsonMessage);
     switch (lastJsonMessage?.task_type) {
       case "convert_to_numpy":
@@ -68,11 +61,11 @@ export function useBackendSubscription({
         break;
     }
   }, [
-    isTheSame,
     lastJsonMessage,
     onLanguageFound,
     onPreProcess,
     onSegmentation,
     onTranscription,
+    prev,
   ]);
 }

@@ -30,7 +30,6 @@ export function useFileJobs(
   const { jobs, setJobs } = usePersistentJobs("jobs");
   const userId = usePersistentId("userId");
 
-  const canStart = useMemo(() => jobs.some((j) => j.queued), [jobs]);
   const restoreJob = useCallback(
     (id: string, file?: File) => {
       setJobs((prev) =>
@@ -250,16 +249,9 @@ export function useFileJobs(
   );
   const onTranscription = useCallback(
     (task: transcriptionResponse) => {
-      const currentProgress = jobs.find((j) => j.id === task.task_id)!.status
-        .transcribing;
-      const diff = task.transcription.end - task.transcription.start;
-      const total = task.transcription.total_time;
-      const newTotal = currentProgress + diff / total;
-      setStatus(task.task_id, "transcribing", newTotal);
       addResult(task.task_id, task.transcription);
-      if (newTotal >= 100) doneJob(task.task_id);
     },
-    [addResult, doneJob, jobs, setStatus]
+    [addResult]
   );
   useBackendSubscription({
     user: userId,
@@ -291,20 +283,32 @@ export function useFileJobs(
     [jobs, progressJob, userId, errorJob]
   );
 
-  const start = useCallback(() => {
+  const process = useCallback(() => {
     for (const job of jobs) {
-      if (job.removed || job.done || job.error || job.sent) continue;
+      if (job.removed || job.done || job.error) continue;
+      if (job.result && job.result[0]) {
+        const total = job.result[0].total_time;
+        let sub_total = 0;
+        for (const res of job.result) {
+          sub_total += res.end - res.start;
+        }
+        if (total - sub_total < 0.1) {
+          doneJob(job.id);
+          continue;
+        }
+      }
+      if (job.sent) continue;
       runJob(job.id);
       sentJob(job.id);
       progressJob(job.id, "processing");
     }
-  }, [jobs, runJob, sentJob, progressJob]);
+  }, [jobs, runJob, sentJob, progressJob, doneJob]);
 
   useEffect(() => {
-    if (canStart) start();
-  }, [jobs.length, start, canStart]);
+    process();
+  }, [process]);
 
-  return { jobs, addFiles, canStart, removeJob, runJob, restoreJob };
+  return { jobs, addFiles, removeJob, runJob, restoreJob };
 }
 
 // EaseInOutCubic function (t from 0 to 1)
