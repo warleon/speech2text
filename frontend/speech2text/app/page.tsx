@@ -4,7 +4,6 @@
 import React, { useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import {
   Table,
   TableBody,
@@ -152,7 +151,6 @@ export default function WhisperS2TPage() {
                               >
                                 <TableHead>Start Time (s)</TableHead>
                                 <TableHead>End Time (s)</TableHead>
-                                <TableHead>Speaker</TableHead>
                                 <TableHead>Text</TableHead>
                                 <TableHead>
                                   <button
@@ -173,9 +171,6 @@ export default function WhisperS2TPage() {
                                   </TableCell>
                                   <TableCell className="whitespace-nowrap tabular-nums">
                                     {seg.end}
-                                  </TableCell>
-                                  <TableCell className="whitespace-nowrap tabular-nums">
-                                    {seg.speaker}
                                   </TableCell>
                                   <TableCell className="whitespace-pre-wrap">
                                     {seg.text}

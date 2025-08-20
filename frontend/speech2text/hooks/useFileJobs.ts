@@ -7,14 +7,25 @@ import { usePersistentJobs } from "./usePersistendJobs";
 import { FILE_KEY, FILE_NAME_KEY, TASK_KEY, USER_KEY } from "@/lib/constants";
 import { useBackendSubscription } from "./useBackendSubscription";
 import axios from "axios";
-import { segment } from "@/types/backend";
+import {
+  backendResponse,
+  languageDetectionResponse,
+  segment,
+  toNumpyResponse,
+  transcriptionResponse,
+  voiceSegmentsDetectionResponse,
+} from "@/types/backend";
 
 interface Props {
   fakeProgressDuration: number;
+  fakeProgressInterval: number;
 }
 
 export function useFileJobs(
-  { fakeProgressDuration }: Props = { fakeProgressDuration: 30000 }
+  { fakeProgressDuration, fakeProgressInterval }: Props = {
+    fakeProgressDuration: 30000,
+    fakeProgressInterval: 3000,
+  }
 ) {
   const { jobs, setJobs } = usePersistentJobs("jobs");
   const userId = usePersistentId("userId");
@@ -131,11 +142,16 @@ export function useFileJobs(
   );
   const setStatus = useCallback(
     (id: string, status: backend_status, value: number) => {
+      const job = jobs.find((j) => j.id === id);
+      if (!job || job.done || job.error || job.status[status] >= value) {
+        return true;
+      }
       setJobs((prev) =>
         prev.map((j) => {
           if (j.id === id) {
-            if (j.error) return j;
-            if (j.status[status] >= value) return j;
+            if (j.done || j.error || j.status[status] >= value) {
+              return j;
+            }
             return {
               ...j,
               status: {
@@ -148,8 +164,9 @@ export function useFileJobs(
           }
         })
       );
+      return false;
     },
-    [setJobs]
+    [setJobs, jobs]
   );
 
   const addFiles = useCallback(
@@ -200,42 +217,56 @@ export function useFileJobs(
         if (t >= 1) t = 1;
 
         const progress = easeInOutCubic(t) * limit;
-        setStatus(id, status, progress);
 
-        if (progress >= limit || progress >= 99) {
+        const shouldStop = setStatus(id, status, progress);
+
+        if (shouldStop || progress >= limit) {
           clearInterval(tick);
         }
-      }, 500);
-      return tick;
+      }, fakeProgressInterval);
     },
-    [fakeProgressDuration, setStatus]
+    [fakeProgressDuration, fakeProgressInterval, setStatus]
+  );
+  const onPreProcess = useCallback(
+    (task: toNumpyResponse) => {
+      setStatus(task.task_id, "processing", 100);
+      progressJob(task.task_id, "detecting_language");
+    },
+    [progressJob, setStatus]
+  );
+  const onLanguageFound = useCallback(
+    (task: languageDetectionResponse) => {
+      setStatus(task.task_id, "detecting_language", 100);
+      progressJob(task.task_id, "fragmenting");
+    },
+    [progressJob, setStatus]
+  );
+  const onSegmentation = useCallback(
+    (task: voiceSegmentsDetectionResponse) => {
+      setStatus(task.task_id, "fragmenting", 100);
+      setStatus(task.task_id, "transcribing", 1);
+    },
+    [setStatus]
+  );
+  const onTranscription = useCallback(
+    (task: transcriptionResponse) => {
+      const currentProgress = jobs.find((j) => j.id === task.task_id)!.status
+        .transcribing;
+      const diff = task.transcription.end - task.transcription.start;
+      const total = task.transcription.total_time;
+      const newTotal = currentProgress + diff / total;
+      setStatus(task.task_id, "transcribing", newTotal);
+      addResult(task.task_id, task.transcription);
+      if (newTotal >= 100) doneJob(task.task_id);
+    },
+    [addResult, doneJob, jobs, setStatus]
   );
   useBackendSubscription({
     user: userId,
-    on: {
-      preProcess: (task) => {
-        setStatus(task.task_id, "processing", 100);
-        progressJob(task.task_id, "detecting_language", 99);
-      },
-      languageFound: (task) => {
-        setStatus(task.task_id, "detecting_language", 100);
-        progressJob(task.task_id, "fragmenting", 99);
-      },
-      segmentation: (task) => {
-        setStatus(task.task_id, "fragmenting", 100);
-        setStatus(task.task_id, "transcribing", 1);
-      },
-      transcription: (task) => {
-        const currentProgress = jobs.find((j) => j.id === task.task_id)!.status
-          .transcribing;
-        const diff = task.transcription.end - task.transcription.start;
-        const total = task.transcription.total_time;
-        const newTotal = currentProgress + diff / total;
-        setStatus(task.task_id, "transcribing", newTotal);
-        addResult(task.task_id, task.transcription);
-        if (newTotal >= 100) doneJob(task.task_id);
-      },
-    },
+    onPreProcess,
+    onLanguageFound,
+    onSegmentation,
+    onTranscription,
   });
 
   const runJob = useCallback(
@@ -249,7 +280,7 @@ export function useFileJobs(
       formData.append(USER_KEY, userId);
       formData.append(TASK_KEY, id);
 
-      progressJob(id, "uploading", 99);
+      progressJob(id, "uploading");
       try {
         const res = await axios.post("/api/upload", formData);
         console.log("BACKEND RESPONSE:", res);
@@ -261,17 +292,17 @@ export function useFileJobs(
   );
 
   const start = useCallback(() => {
-    // process each queued job sequentially for simplicity
     for (const job of jobs) {
       if (job.removed || job.done || job.error || job.sent) continue;
       runJob(job.id);
       sentJob(job.id);
+      progressJob(job.id, "processing");
     }
-  }, [jobs, runJob, sentJob]);
+  }, [jobs, runJob, sentJob, progressJob]);
 
   useEffect(() => {
-    start();
-  }, [jobs, start]);
+    if (canStart) start();
+  }, [jobs.length, start, canStart]);
 
   return { jobs, addFiles, canStart, removeJob, runJob, restoreJob };
 }

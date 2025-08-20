@@ -44,11 +44,11 @@ def process_queues(connections: Dict[str, Any]):
             try:
                 user = result["user"]
                 task_type = result["task_type"]
-                conn = connections[user]
-                if not conn:
+                if not user in connections:
                     raise ConnectionError(
                         f"Error notifying user {user} about task {task_type}, connection not stablished",
                     )
+                conn = connections[user]
                 logger.info("Sending %s to the user %s", jsonResult, user)
                 conn.send(jsonResult)
             except Exception as e:

@@ -6,52 +6,73 @@ import {
   transcriptionResponse,
   voiceSegmentsDetectionResponse,
 } from "@/types/backend";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useWebSocket from "react-use-websocket";
+import { usePrevious } from "./usePrevious";
 
 interface Props {
   user: string;
-  on?: {
-    transcription?: (r: transcriptionResponse) => void | Promise<void>;
-    languageFound?: (r: languageDetectionResponse) => void | Promise<void>;
-    segmentation?: (r: voiceSegmentsDetectionResponse) => void | Promise<void>;
-    preProcess?: (r: toNumpyResponse) => void | Promise<void>;
-  };
+  onTranscription?: (r: transcriptionResponse) => void | Promise<void>;
+  onLanguageFound?: (r: languageDetectionResponse) => void | Promise<void>;
+  onSegmentation?: (r: voiceSegmentsDetectionResponse) => void | Promise<void>;
+  onPreProcess?: (r: toNumpyResponse) => void | Promise<void>;
 }
 
-export function useBackendSubscription({ user, on }: Props) {
+export function useBackendSubscription({
+  user,
+  onLanguageFound,
+  onPreProcess,
+  onSegmentation,
+  onTranscription,
+}: Props) {
   //const window = useWindow();
   const connectionString = useMemo(() => {
     const host = "localhost:8000";
     return `ws://${host}/ws?user=${user}`; //TODO: should be url sanitized
   }, [user /*window*/]);
   const { lastMessage } = useWebSocket(connectionString);
-  const lastJsonMessage = useMemo(() => {
-    if (lastMessage?.data) {
-      return JSON.parse(lastMessage?.data) as backendResponse;
-    }
-    return null;
-  }, [lastMessage]);
+  const prevMessage = usePrevious(lastMessage?.data);
+  const isTheSame = useMemo(
+    () => lastMessage?.data === prevMessage,
+    [lastMessage, prevMessage]
+  );
+  const [lastJsonMessage, setLastJsonMessage] =
+    useState<backendResponse | null>(null);
   useEffect(() => {
+    if (lastMessage?.data) {
+      if (!isTheSame) setLastJsonMessage(JSON.parse(lastMessage?.data));
+    } else {
+      setLastJsonMessage(null);
+    }
+  }, [lastMessage, isTheSame]);
+  useEffect(() => {
+    if (isTheSame) return;
     console.log("Last JSON message:", lastJsonMessage);
     switch (lastJsonMessage?.task_type) {
       case "convert_to_numpy":
-        if (on?.preProcess) on.preProcess(lastJsonMessage as toNumpyResponse);
+        if (onPreProcess) onPreProcess(lastJsonMessage as toNumpyResponse);
         break;
       case "detect_language":
-        if (on?.languageFound)
-          on.languageFound(lastJsonMessage as languageDetectionResponse);
+        if (onLanguageFound)
+          onLanguageFound(lastJsonMessage as languageDetectionResponse);
         break;
       case "detect_voice_segments":
-        if (on?.segmentation)
-          on.segmentation(lastJsonMessage as voiceSegmentsDetectionResponse);
+        if (onSegmentation)
+          onSegmentation(lastJsonMessage as voiceSegmentsDetectionResponse);
         break;
       case "transcribe_segment":
-        if (on?.transcription)
-          on.transcription(lastJsonMessage as transcriptionResponse);
+        if (onTranscription)
+          onTranscription(lastJsonMessage as transcriptionResponse);
         break;
       default:
         break;
     }
-  }, [lastJsonMessage, on]);
+  }, [
+    isTheSame,
+    lastJsonMessage,
+    onLanguageFound,
+    onPreProcess,
+    onSegmentation,
+    onTranscription,
+  ]);
 }

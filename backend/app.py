@@ -44,6 +44,9 @@ def websocket(conn):
         connections.pop(user)
 
 
+# TODO add information endpoints to fetch progress information
+
+
 if __name__ == "__main__":
     models = AIModels()
     models.load_models()  # just to ensure
