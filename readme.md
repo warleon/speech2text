@@ -10,3 +10,5 @@
 - [ ] Hash file content on upload to asign as task_id
 - [ ] Show total audio time and total transcriptable time
 - [ ] Enable DAG flow execution, add task dependencies
+- [x] Polish UI, change the drop text to files icon
+- [ ] Round timestamps to 2 decimals

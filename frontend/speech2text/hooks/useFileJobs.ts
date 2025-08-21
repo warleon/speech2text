@@ -173,7 +173,6 @@ export function useFileJobs(
       if (!files) return;
       const items: FileJob[] = [];
       Array.from(files).forEach((f) => {
-        if (!f.type || !f.type.includes("wav")) return; // only wav
         const id = `${f.name}-${f.size}-${f.lastModified}-${userId}`;
         const alreadyJob = jobs.find((j) => j.id === id);
         if (alreadyJob) {

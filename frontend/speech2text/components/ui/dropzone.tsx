@@ -1,12 +1,12 @@
 import { useWindow } from "@/hooks/useWindow";
 import { useCallback, useEffect, useRef, useState } from "react";
+import MediaFolderIcon from "./mediaFolderIcon";
 
 interface Props {
-  text: string;
   addFiles: (files: FileList | null) => void;
   fullScreen?: boolean;
 }
-export function Dropzone({ text, addFiles, fullScreen }: Props) {
+export function Dropzone({ addFiles, fullScreen }: Props) {
   const window = useWindow();
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -59,7 +59,7 @@ export function Dropzone({ text, addFiles, fullScreen }: Props) {
         window?.removeEventListener("drop", onDrop);
       };
     }
-  }, [onDrop, onDragOver, onDragLeave, onDragEnter, fullScreen]);
+  }, [onDrop, onDragOver, onDragLeave, onDragEnter, fullScreen, window]);
   return (
     <div
       onDrop={onDrop}
@@ -67,17 +67,17 @@ export function Dropzone({ text, addFiles, fullScreen }: Props) {
       onDragLeave={onDragLeave}
       onClick={() => inputRef.current?.click()}
       className={
-        "rounded-2xl border-2 border-dashed p-10 text-center transition " +
+        "rounded-2xl border-2 border-dashed p-10 text-center transition cursor-pointer " +
         (dragActive
           ? "border-primary bg-primary/5"
           : "border-muted-foreground/30")
       }
     >
-      <p className="text-sm text-muted-foreground">{text}</p>
+      <MediaFolderIcon />
       <input
         ref={inputRef}
         type="file"
-        accept="audio/wav"
+        accept="audio/*,video/*,.mp3,.wav,.ogg,.mp4,.mkv,.avi,.mov,.webm"
         multiple
         className="hidden"
         onChange={(e) => {
@@ -91,7 +91,7 @@ export function Dropzone({ text, addFiles, fullScreen }: Props) {
           className="fixed inset-0 z-50 flex items-center justify-center bg-primary/10 border-4 border-primary border-dashed"
           onClick={() => inputRef.current?.click()}
         >
-          <p className="text-lg font-semibold text-primary">{text}</p>
+          <MediaFolderIcon />
         </div>
       )}
     </div>

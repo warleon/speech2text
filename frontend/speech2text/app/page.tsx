@@ -54,11 +54,7 @@ export default function WhisperS2TPage() {
         </div>
 
         {/* Dropzone */}
-        <Dropzone
-          text="Drag & drop WAV files or click here"
-          addFiles={addFiles}
-          fullScreen={true}
-        />
+        <Dropzone addFiles={addFiles} fullScreen={true} />
         {/* File jobs */}
         <div className="grid gap-4">
           <AnimatePresence>
