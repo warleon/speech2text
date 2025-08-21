@@ -1,6 +1,6 @@
 # TODO:
 
-- [ ] Enable task retrial on failure
+- [ ] Enable task retries # priority
 - [ ] Install a production server that supports flask-sock
 - [ ] Make a worker pool for each queue - to enable parallel or concurrent task execution
 - [ ] Maybe make the queues process queues
@@ -10,5 +10,5 @@
 - [ ] Hash file content on upload to asign as task_id
 - [ ] Show total audio time and total transcriptable time
 - [ ] Enable DAG flow execution, add task dependencies
-- [x] Polish UI, change the drop text to files icon
+- [ ] Polish UI, make the file set icon responsive
 - [ ] Round timestamps to 2 decimals
