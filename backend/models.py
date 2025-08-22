@@ -1,18 +1,27 @@
-import os
+from transformers import Wav2Vec2ForCTC
 from whisperx.asr import WhisperModel
 from whisperx.audio import SAMPLE_RATE, CHUNK_LENGTH, N_SAMPLES, log_mel_spectrogram
-from whisperx.vad import VoiceActivitySegmentation, merge_chunks
 from whisperx import vad
-import torch
-from pyannote.audio.core.model import Model
-import tokenizers
+from whisperx.vad import VoiceActivitySegmentation, merge_chunks
+from whisperx.types import SingleSegment
+from whisperx.diarize import DiarizationPipeline, assign_word_speakers
+from whisperx.alignment import (
+    DEFAULT_ALIGN_MODELS_HF,
+    DEFAULT_ALIGN_MODELS_TORCH,
+    load_align_model,
+    align,
+)
 import faster_whisper
+from faster_whisper.tokenizer import _LANGUAGE_CODES, _TASKS, Tokenizer
+from pyannote.audio.core.model import Model
+import torch
+import tokenizers
 import threading
 import numpy as np
 import logging
 from logging import DEBUG
-from faster_whisper.tokenizer import _LANGUAGE_CODES, _TASKS, Tokenizer
 from typing import Dict, Any
+import os
 
 logging.basicConfig(level=logging.NOTSET)
 
@@ -26,6 +35,10 @@ class AIModels:
     whisper_model: WhisperModel = None
     vad_model: VoiceActivitySegmentation = None
     base_tokenizer: tokenizers.Tokenizer = None
+    tokenizers: Dict[str, Tokenizer] = {}
+    align_models: Dict[str, (Any | Wav2Vec2ForCTC, Dict[str, Any])] = {}
+    diarization_pipeline: DiarizationPipeline = None
+
     default_asr_options = faster_whisper.transcribe.TranscriptionOptions(
         **{
             "beam_size": 5,
@@ -60,8 +73,6 @@ class AIModels:
         "min_duration_on": 0.1,
         "min_duration_off": 0.1,
     }
-
-    tokenizers: Dict[str, Tokenizer] = {}
 
     @classmethod
     def _get_env_vars(cls):
@@ -101,6 +112,12 @@ class AIModels:
         )
 
     @classmethod
+    def _load_diarize(cls, token: str):
+        cls.diarization_pipeline = DiarizationPipeline(
+            use_auth_token=token, device="cpu"
+        )
+
+    @classmethod
     def load_models(cls):
         with cls._lock:
             token, cache_root = cls._get_env_vars()
@@ -116,7 +133,7 @@ class AIModels:
         logger.info("Check for vad model instance")
         if not cls.vad_model or not cls.vad_model.instantiated:
             logger.error("vad model instance not found")
-            raise ValueError("AIWorker.vad_model has not been initialized")
+            raise ValueError(f"{__class__.__name__}.vad_model has not been initialized")
         logger.info("vad model instance found")
         logger.info("Perform vad model inference")
         segments = cls.vad_model(
@@ -131,11 +148,17 @@ class AIModels:
     @classmethod
     def get_transcription(cls, audio: np.ndarray, lang: str):
         if not cls.whisper_model:
-            raise ValueError("AIWorker.whisper_model has not been initialized")
+            raise ValueError(
+                f"{__class__.__name__}.whisper_model has not been initialized"
+            )
         if not cls.base_tokenizer:
-            raise ValueError("AIWorker.base_tokenizer has not been initialized")
+            raise ValueError(
+                f"{__class__.__name__}.base_tokenizer has not been initialized"
+            )
         if not cls.default_asr_options:
-            raise ValueError("AIWorker.default_asr_options has not been initialized")
+            raise ValueError(
+                f"{__class__.__name__}.default_asr_options has not been initialized"
+            )
         model_n_mels = cls.whisper_model.feat_kwargs.get("feature_size")
         logger.info("Transcribing audio of shape %s", audio.shape)
         features = log_mel_spectrogram(
@@ -152,7 +175,9 @@ class AIModels:
     @classmethod
     def get_tokenizer(cls, lang: str):
         if not cls.base_tokenizer:
-            raise ValueError("AIWorker.base_tokenizer has not been initialized")
+            raise ValueError(
+                f"{__class__.__name__}.base_tokenizer has not been initialized"
+            )
         if lang not in _LANGUAGE_CODES:
             raise ValueError("Language is not supported by the AI model")
         if not lang in cls.tokenizers:
@@ -162,9 +187,42 @@ class AIModels:
         return cls.tokenizers[lang]
 
     @classmethod
+    def get_align_model_and_metadata(cls, lang: str):
+        if (
+            lang not in DEFAULT_ALIGN_MODELS_HF
+            or lang not in DEFAULT_ALIGN_MODELS_TORCH
+        ):
+            raise ValueError(
+                "Language is not supported by the Aligment model, ask for support"
+            )
+        if not lang in cls.align_models:
+            cls.align_models[lang] = load_align_model(language_code=lang, device="cpu")
+        return cls.tokenizers[lang]
+
+    @classmethod
+    def get_aligment(
+        cls,
+        segment: SingleSegment,
+        audio_segment: np.ndarray,
+        lang: str,
+        char_level: bool = False,
+    ):
+        model, metadata = cls.get_align_model_and_metadata(lang)
+        return align(
+            [segment],
+            model,
+            metadata,
+            audio_segment,
+            "cpu",
+            return_char_alignments=char_level,
+        )
+
+    @classmethod
     def get_language(cls, audio: np.ndarray):
         if not cls.whisper_model:
-            raise ValueError("AIWorker.whisper_model has not been initialized")
+            raise ValueError(
+                f"{__class__.__name__}.whisper_model has not been initialized"
+            )
         if audio.shape[0] < N_SAMPLES:
             logger.warning(
                 "Audio is shorter than 30s, language detection may be inaccurate."
@@ -182,6 +240,16 @@ class AIModels:
             f"Detected language: {language} ({language_probability:.2f}) in first 30s of audio..."
         )
         return language
+
+    # TODO: this should be done with all the segments instead - requires dependency enabled
+    @classmethod
+    def get_diarization(cls, segment: SingleSegment, audio_segment: np.ndarray):
+        if not cls.diarization_pipeline:
+            raise ValueError(
+                f"{__class__.__name__}.diarization_pipeline has not been initialized"
+            )
+        speaker_data = cls.diarization_pipeline(audio_segment)
+        return assign_word_speakers(speaker_data, {"segments": [segment]})
 
     def __init__(self):
         self.load_models()
