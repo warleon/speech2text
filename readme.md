@@ -8,7 +8,6 @@
 - [ ] Enable horizontal scaling - networking
 - [ ] Enable diarization pipeline - work in progress
 - [ ] Enable word level segmentation pipeline - work in progress
-- [ ] Hash file content on upload to asign as task_id
 - [ ] Show total audio time and total transcriptable time
 - [ ] Enable DAG flow execution, add task dependencies
 - [ ] Polish UI, make the file set icon responsive

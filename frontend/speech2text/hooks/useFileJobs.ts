@@ -172,8 +172,8 @@ export function useFileJobs(
     (files: FileList | null) => {
       if (!files) return;
       const items: FileJob[] = [];
-      Array.from(files).forEach((f) => {
-        const id = `${f.name}-${f.size}-${f.lastModified}-${userId}`;
+      Array.from(files).forEach(async (f) => {
+        const id = await hashFile(f);
         const alreadyJob = jobs.find((j) => j.id === id);
         if (alreadyJob) {
           if (alreadyJob.removed || alreadyJob.error)
@@ -202,7 +202,7 @@ export function useFileJobs(
       });
       if (items.length) setJobs((prev) => [...prev, ...items]);
     },
-    [setJobs, userId, jobs, restoreJob]
+    [setJobs, jobs, restoreJob]
   );
   const progressJob = useCallback(
     (id: string, status: backend_status, limit: number = 99) => {
@@ -314,4 +314,20 @@ export function useFileJobs(
 // EaseInOutCubic function (t from 0 to 1)
 function easeInOutCubic(t: number) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+async function hashFile(file: File) {
+  // 1. Read the file into an ArrayBuffer
+  const buffer = await file.arrayBuffer();
+
+  // 2. Hash it with SubtleCrypto
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
+
+  // 3. Convert ArrayBuffer -> hex string
+  const hashArray = Array.from(new Uint8Array(digest));
+  const hashHex = hashArray
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  return hashHex;
 }
