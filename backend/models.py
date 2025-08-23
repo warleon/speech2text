@@ -112,7 +112,7 @@ class AIModels:
         )
 
     @classmethod
-    def _load_diarize(cls, token: str):
+    def _load_diarization_pipeline(cls, token: str):
         cls.diarization_pipeline = DiarizationPipeline(
             use_auth_token=token, device="cpu"
         )
@@ -127,6 +127,8 @@ class AIModels:
                 cls._load_vad(token)
             if not cls.whisper_model:
                 cls._load_whisper(cache_root)
+            if not cls.diarization_pipeline:
+                cls._load_diarization_pipeline(token)
 
     @classmethod
     def get_voice_segments(cls, audio: np.ndarray):
@@ -190,14 +192,14 @@ class AIModels:
     def get_align_model_and_metadata(cls, lang: str):
         if (
             lang not in DEFAULT_ALIGN_MODELS_HF
-            or lang not in DEFAULT_ALIGN_MODELS_TORCH
+            and lang not in DEFAULT_ALIGN_MODELS_TORCH
         ):
             raise ValueError(
-                "Language is not supported by the Aligment model, ask for support"
+                f"Language {lang} is not supported by the Aligment model, ask for support"
             )
         if not lang in cls.align_models:
             cls.align_models[lang] = load_align_model(language_code=lang, device="cpu")
-        return cls.tokenizers[lang]
+        return cls.align_models[lang]
 
     @classmethod
     def get_aligment(
@@ -248,6 +250,7 @@ class AIModels:
                 f"{__class__.__name__}.diarization_pipeline has not been initialized"
             )
         speaker_data = cls.diarization_pipeline(audio)
+
         return assign_word_speakers(speaker_data, {"segments": segments})
 
     def __init__(self):

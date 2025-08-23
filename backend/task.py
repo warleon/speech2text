@@ -77,8 +77,9 @@ class Task:
         self.queue.task_done()
         logger.info(f"Finished task {self.id} execution, returned: {self.result}")
 
-        for dep in self.dependants.values():
-            dep.enqueue()
+        for deps in self.dependants.values():
+            for dep in deps:
+                dep.enqueue()
 
         return self.result
 

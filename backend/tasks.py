@@ -27,8 +27,11 @@ def align_words(segment: SingleSegment, audio_path: str, lang: str, **metadata):
     aligned = AIModels.get_aligment(
         segment, audio, lang
     )  # may break because of segmented audio
+    result_len = len(aligned["segments"])
+    if result_len != 1:
+        raise ValueError(f"Expected segments to have a single segment got {result_len}")
     response = {
-        "aligned": aligned
+        "aligned": aligned["segments"][0]
     }  # timestamps may be shifted because of segmented audio
     return response
 
@@ -36,13 +39,13 @@ def align_words(segment: SingleSegment, audio_path: str, lang: str, **metadata):
 # needed to lauch diarize with align_words as dependencies
 def collect_transciptions(
     transcription: List[SingleSegment],
-    audio_paths: List[str],
+    segment_path: List[str],
     full_audio_path: str,
     lang: List[str],
     **metadata,
 ):
     tasks: List[Task] = []
-    for segment, path, _lang in zip(transcription, audio_paths, cycle(lang)):
+    for segment, path, _lang in zip(transcription, segment_path, cycle(lang)):
         tasks.append(
             Task(
                 metadata["flow_id"],
@@ -72,16 +75,14 @@ def transcribe_segment(
     **metadata,
 ):
     audio = np.load(segment_path)
-    text = AIModels.get_transcription(audio, lang)
+    text = "".join(AIModels.get_transcription(audio, lang))
     result = {
         "text": text,
         "start": start_time_s,
         "end": end_time_s,
         "total_time": total_time,
     }
-    response = {
-        "transcription": result,
-    }
+    response = {"transcription": result, "segment_path": segment_path}
     return response
 
 
