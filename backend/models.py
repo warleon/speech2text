@@ -3,7 +3,7 @@ from whisperx.asr import WhisperModel
 from whisperx.audio import SAMPLE_RATE, CHUNK_LENGTH, N_SAMPLES, log_mel_spectrogram
 from whisperx import vad
 from whisperx.vad import VoiceActivitySegmentation, merge_chunks
-from whisperx.types import SingleSegment
+from whisperx.types import SingleSegment, SingleAlignedSegment
 from whisperx.diarize import DiarizationPipeline, assign_word_speakers
 from whisperx.alignment import (
     DEFAULT_ALIGN_MODELS_HF,
@@ -20,7 +20,7 @@ import threading
 import numpy as np
 import logging
 from logging import DEBUG
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, List
 import os
 
 logging.basicConfig(level=logging.NOTSET)
@@ -241,21 +241,18 @@ class AIModels:
         )
         return language
 
-    # TODO: this should be done with all the segments instead - requires dependency enabled
     @classmethod
-    def get_diarization(cls, segment: SingleSegment, audio_segment: np.ndarray):
+    def get_diarization(cls, segments: List[SingleAlignedSegment], audio: np.ndarray):
         if not cls.diarization_pipeline:
             raise ValueError(
                 f"{__class__.__name__}.diarization_pipeline has not been initialized"
             )
-        speaker_data = cls.diarization_pipeline(audio_segment)
-        return assign_word_speakers(speaker_data, {"segments": [segment]})
+        speaker_data = cls.diarization_pipeline(audio)
+        return assign_word_speakers(speaker_data, {"segments": segments})
 
     def __init__(self):
         self.load_models()
 
-
-# diarize_model = DiarizationPipeline(use_auth_token=HUGGING_FACE_TOKEN, device="cpu")
 
 if __name__ == "__main__":
     AIModels()

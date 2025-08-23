@@ -1,11 +1,13 @@
 import os
 from whisperx import load_audio
 from whisperx.audio import SAMPLE_RATE
+from whisperx.types import SingleSegment, SingleAlignedSegment
 import numpy as np
 from queues import *
 from models import AIModels
 from models import logger
 from task import Task, partial, List
+from itertools import cycle
 
 
 UPLOADS = "/uploads"
@@ -13,16 +15,52 @@ WHISPER_DATA = UPLOADS
 EXT = ".npy"
 
 
-def diarize(**metadata):
-    pass
+def diarize(aligned: List[SingleAlignedSegment], audio_path: str, **metadata):
+    audio = np.load(audio_path)
+    diarization = AIModels.get_diarization(aligned, audio)
+    response = {"diarization": diarization}
+    return response
 
 
-def align_words(**metadata):
-    pass
+def align_words(segment: SingleSegment, audio_path: str, lang: str, **metadata):
+    audio = np.load(audio_path)
+    aligned = AIModels.get_aligment(
+        segment, audio, lang
+    )  # may break because of segmented audio
+    response = {
+        "aligned": aligned
+    }  # timestamps may be shifted because of segmented audio
+    return response
 
 
-def collect_transciptions(**metadata):
-    pass
+# needed to lauch diarize with align_words as dependencies
+def collect_transciptions(
+    transcription: List[SingleSegment],
+    audio_paths: List[str],
+    full_audio_path: str,
+    lang: List[str],
+    **metadata,
+):
+    tasks: List[Task] = []
+    for segment, path, _lang in zip(transcription, audio_paths, cycle(lang)):
+        tasks.append(
+            Task(
+                metadata["flow_id"],
+                partial(align_words, segment, path, _lang),
+                metadata["queue"],
+                metadata=metadata,
+            )
+        )
+    Task(
+        metadata["flow_id"],
+        partial(diarize, audio_path=full_audio_path),
+        metadata["queue"],
+        tasks,
+        metadata,
+    )
+    for task in tasks:
+        task.enqueue()
+    return {}
 
 
 def transcribe_segment(
@@ -55,9 +93,6 @@ def detect_language(
     lang = AIModels.get_language(audio)
     response = {
         "lang": lang,
-        "user": metadata["user"],
-        "task_id": metadata["flow_id"],
-        "task_type": "detect_language",
     }
     return response
 
@@ -88,7 +123,7 @@ def detect_voice_segments(
                     metadata["flow_id"],
                     partial(detect_language, op),
                     language_queue,
-                    **metadata,
+                    metadata=metadata,
                 )
             )
         tasks.append(
@@ -103,10 +138,20 @@ def detect_voice_segments(
                 ),
                 transcription_queue,
                 [tasks[0]],
+                metadata,
             )
         )
-    tasks[0].enqueue()
-    collect = Task(metadata["flow_id"], collect_transciptions, default_queue, tasks[1:])
+
+    if len(tasks):
+        Task(
+            metadata["flow_id"],
+            partial(collect_transciptions, full_audio_path=file_path),
+            default_queue,
+            tasks,
+            metadata,
+            unpack_single=False,
+        )
+        tasks[0].enqueue()
 
     response = {
         "segments_timestamps": timestamps,

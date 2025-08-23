@@ -18,6 +18,7 @@ class Task:
         queue: Queue,
         dependencies: List["Task"] = [],
         metadata: Dict[str, Any] = {},
+        **kvargs,
     ):
         self.id = (flow_id, Task.get_on_call_name(on_call))
         if isinstance(on_call, partial):
@@ -32,14 +33,16 @@ class Task:
         self.result: Dict[Any, Any] = None
 
         # dependency management
-        self.dependants: Dict[Tuple[str, str], "Task"] = {}
-        self.dependencies: Dict[Tuple[str, str], "Task"] = {}
+        self.dependants: Dict[Tuple[str, str], List["Task"]] = defaultdict(list)
+        self.dependencies: Dict[Tuple[str, str], List["Task"]] = defaultdict(list)
         for dep in dependencies:
             self._add_dependency(dep)
 
         # set metadata
         self.metadata = {
+            "unpack_single": True,  # may be overwriten by metadata or kvargs
             **metadata,
+            **kvargs,
             "flow_id": self.id[0],
             "task_type": self.id[1],
             "queue": self.queue,
@@ -47,18 +50,19 @@ class Task:
 
     @property
     def ready(self):
-        for dep in self.dependencies.values():
-            if not dep.done:
-                return False
+        for deps in self.dependencies.values():
+            for dep in deps:
+                if not dep.done:
+                    return False
         return True
 
     def _add_dependency(self, other: "Task"):
-        self.dependencies[other.id] = other
+        self.dependencies[other.id].append(other)
         other._add_dependant(self)
         pass
 
     def _add_dependant(self, other: "Task"):
-        self.dependants[other.id] = other
+        self.dependants[other.id].append(other)
         pass
 
     def __call__(
@@ -66,7 +70,7 @@ class Task:
     ):
         self.started = True
         logger.info(
-            f"Started task {self.id} execution with arguments {self.on_call.args} {self.on_call.keywords}"
+            f"Started task {self.id} execution with arguments {self.on_call.args} {self.on_call.keywords} {self.metadata}"
         )
         self.result = self.on_call(**self.metadata)
         self.done = True
@@ -89,15 +93,17 @@ class Task:
             return False
 
         kwargs = defaultdict(list)
-        for dep in self.dependencies.values():
-            for k, v in dep.result.items():
-                kwargs[k].append(v)
+        for deps in self.dependencies.values():
+            for dep in deps:
+                for k, v in dep.result.items():
+                    kwargs[k].append(v)
 
-        kwargs = {k: v[0] if len(v) == 1 else v for k, v in kwargs.items()}
+        if self.metadata["unpack_single"]:
+            kwargs = {k: v[0] if len(v) == 1 else v for k, v in kwargs.items()}
         self._update_on_call(kwargs)
         self.queue.put(self)
         logger.debug(
-            f"Succesfully enqueued task {self.id} to run with arguments {self.on_call.args} {self.on_call.keywords}"
+            f"Succesfully enqueued task {self.id} to run with arguments {self.on_call.args} {self.on_call.keywords} {self.metadata}"
         )
         return True
 
