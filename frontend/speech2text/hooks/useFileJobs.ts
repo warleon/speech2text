@@ -169,37 +169,40 @@ export function useFileJobs(
   );
 
   const addFiles = useCallback(
-    (files: FileList | null) => {
+    async (files: FileList | null) => {
       if (!files) return;
       const items: FileJob[] = [];
-      Array.from(files).forEach(async (f) => {
-        const id = await hashFile(f);
-        const alreadyJob = jobs.find((j) => j.id === id);
-        if (alreadyJob) {
-          if (alreadyJob.removed || alreadyJob.error)
-            restoreJob(alreadyJob.id, f);
-          return;
-        }
-        items.push({
-          id,
-          file: f,
-          fileSize: `${(f.size / (1024 * 1024)).toLocaleString()} MB`,
-          fileName: f.name,
-          color: randomColor(f.name + f.size + ""),
-          queued: true,
-          done: false,
-          error: null,
-          removed: false,
-          sent: false,
-          status: {
-            detecting_language: 0,
-            processing: 0,
-            transcribing: 0,
-            uploading: 0,
-            fragmenting: 0,
-          },
-        } satisfies FileJob);
-      });
+      await Promise.all(
+        Array.from(files).map(async (f) => {
+          const id = await hashFile(f);
+          const alreadyJob = jobs.find((j) => j.id === id);
+          if (alreadyJob) {
+            if (alreadyJob.removed || alreadyJob.error)
+              restoreJob(alreadyJob.id, f);
+            return;
+          }
+          const nlen = items.push({
+            id,
+            file: f,
+            fileSize: `${(f.size / (1024 * 1024)).toLocaleString()} MB`,
+            fileName: f.name,
+            color: randomColor(f.name + f.size + ""),
+            queued: true,
+            done: false,
+            error: null,
+            removed: false,
+            sent: false,
+            status: {
+              detecting_language: 0,
+              processing: 0,
+              transcribing: 0,
+              uploading: 0,
+              fragmenting: 0,
+            },
+          } satisfies FileJob);
+          console.log("Added new file to the list, new size", nlen);
+        })
+      );
       if (items.length) setJobs((prev) => [...prev, ...items]);
     },
     [setJobs, jobs, restoreJob]

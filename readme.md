@@ -9,7 +9,7 @@
 - [ ] Enable diarization pipeline - work in progress
 - [ ] Enable word level segmentation pipeline - work in progress
 - [ ] Show total audio time and total transcriptable time
-- [ ] Enable DAG flow execution, add task dependencies
 - [ ] Polish UI, make the file set icon responsive
 - [ ] Round timestamps to 2 decimals
 - [ ] Replace "cpu" for DEVICE env variable and set build ARG
+- [ ] Cache all the models weights in the volume to avoid doing network requests

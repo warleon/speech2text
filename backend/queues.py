@@ -48,5 +48,5 @@ def process_queues(connections: Dict[str, Any]):
         except Empty:
             pass
         except Exception as e:
-            logger.error("Error on task %s: %s", task, str(e))
+            logger.error(f"Error on task {task.id}: {str(e)}")
             logger.exception(e)
