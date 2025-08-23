@@ -1,7 +1,12 @@
-from typing import List, Callable, Tuple, Dict, Any
+from typing import List, Callable, Tuple, Dict, Any, Union
 from functools import partial
 from queue import Queue
 from collections import defaultdict
+import logging
+
+logging.basicConfig(level=logging.NOTSET)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 # Represents a function call or flow step
@@ -9,13 +14,15 @@ class Task:
     def __init__(
         self,
         flow_id: str,  # the overall flow which this task is beign executed in
-        task_name: str,  #
+        on_call: Union[partial, Callable[..., object]],
         queue: Queue,
-        onCall: partial | Callable[..., object],
-        dependencies: List["Task"],
+        dependencies: List["Task"] = [],
     ):
-        self.id = (flow_id, task_name)
-        self.onCall = onCall
+        self.id = (flow_id, Task.get_on_call_name(on_call))
+        if isinstance(on_call, partial):
+            self.on_call = on_call
+        else:
+            self.on_call = partial(on_call)
         self.queue = queue
 
         # state
@@ -23,6 +30,7 @@ class Task:
         self.done: bool = False
         self.result: Dict[Any, Any] = None
 
+        # dependency management
         self.dependants: Dict[Tuple[str, str], "Task"] = {}
         self.dependencies: Dict[Tuple[str, str], "Task"] = {}
         for dep in dependencies:
@@ -48,18 +56,28 @@ class Task:
         self,
     ):
         self.started = True
-        self.result = self.onCall()
+        logger.info(
+            f"Started task {self.id} execution with arguments {self.on_call.args} {self.on_call.keywords}"
+        )
+        self.result = self.on_call()
         self.done = True
+        self.queue.task_done()
+        logger.info(f"Finished task {self.id} execution, returned: {self.result}")
 
         for dep in self.dependants.values():
-            dep.notify()
+            dep.enqueue()
 
-    def _update_onCall(self, kwargs: Dict[Any, Any | List[Any]]):
-        self.onCall = partial(self.onCall, **kwargs)
+        return self.result
 
-    def notify(self):
+    def _update_on_call(self, kwargs: Dict[Any, Union[Any, List[Any]]]):
+        self.on_call = partial(self.on_call, **kwargs)
+
+    def enqueue(self):
         if not self.ready:
-            return
+            logger.debug(
+                f"Failed to enqueue task {self.id}, not all dependencies are done"
+            )
+            return False
 
         kwargs = defaultdict(list)
         for dep in self.dependencies.values():
@@ -67,5 +85,15 @@ class Task:
                 kwargs[k].append(v)
 
         kwargs = {k: v[0] if len(v) == 1 else v for k, v in kwargs.items()}
-        self._update_onCall(kwargs)
+        self._update_on_call(kwargs)
         self.queue.put(self)
+        logger.debug(
+            f"Succesfully enqueued task {self.id} to run with arguments {self.on_call.args} {self.on_call.keywords}"
+        )
+        return True
+
+    @staticmethod
+    def get_on_call_name(f: Union[partial, Callable[..., object]]) -> str:
+        if isinstance(f, partial):
+            return f.func.__name__
+        return getattr(f, "__name__", repr(f))

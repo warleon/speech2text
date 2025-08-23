@@ -20,7 +20,7 @@ import threading
 import numpy as np
 import logging
 from logging import DEBUG
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 import os
 
 logging.basicConfig(level=logging.NOTSET)
@@ -36,7 +36,7 @@ class AIModels:
     vad_model: VoiceActivitySegmentation = None
     base_tokenizer: tokenizers.Tokenizer = None
     tokenizers: Dict[str, Tokenizer] = {}
-    align_models: Dict[str, (Any | Wav2Vec2ForCTC, Dict[str, Any])] = {}
+    align_models: Dict[str, Tuple[Any, Dict[str, Any]]] = {}
     diarization_pipeline: DiarizationPipeline = None
 
     default_asr_options = faster_whisper.transcribe.TranscriptionOptions(

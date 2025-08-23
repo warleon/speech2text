@@ -1,46 +1,38 @@
 from queue import Queue, Empty
-from typing import Callable, Dict, Any
+from typing import Callable, Dict, Tuple, Any
 from functools import partial
 from models import logger
 import json
 from itertools import cycle
+from task import Task
 
 preprocess_queue = Queue()
 language_queue = Queue()
 split_queue = Queue()
 transcription_queue = Queue()
-default_queue = Queue()  # just in case
 
-
-def enqueue(q: Queue, func: Callable[..., object], *args, **kwargs):
-    q.put((func, args, kwargs))
-    logger.info("Enqueued task %s", func.__name__)
+_ALL_QUEUES = [
+    preprocess_queue,
+    language_queue,
+    split_queue,
+    transcription_queue,
+]
 
 
 def dequeue(q: Queue):
-    func, args, kwargs = q.get(block=False)
-    logger.info("Dequeued task %s", func.__name__)
-    q.task_done()
-    return partial(func, *args, **kwargs)
+    task = q.get(block=False)
+    if not isinstance(task, Task):
+        raise ValueError(f"A non Task object was found on dequeue")
+    return task
 
 
 def process_queues(connections: Dict[str, Any]):
     logger.info("Spinning up working thread")
-    for q in cycle(
-        [
-            preprocess_queue,
-            language_queue,
-            split_queue,
-            transcription_queue,
-            default_queue,
-        ]
-    ):
+    for q in cycle(_ALL_QUEUES):
         try:
             task = dequeue(q)
-            logger.info("Executing task %s", task)
             result = task()
             jsonResult = json.dumps(result)
-            logger.info("Result: %s", jsonResult)
             try:
                 user = result["user"]
                 task_type = result["task_type"]

@@ -5,6 +5,7 @@ import numpy as np
 from queues import *
 from models import AIModels
 from models import logger
+from task import Task, partial, List
 
 
 UPLOADS = "/uploads"
@@ -39,7 +40,21 @@ def transcribe_segment(
     return response
 
 
-def detect_voice_segments(file_path: str, lang: str, user: str, task_id: str):
+def detect_language(file_path: str, user: str, task_id: str):
+    audio = np.load(file_path)
+    lang = AIModels.get_language(audio)
+    response = {
+        "detected_language": lang,
+        "lang": lang,
+        "user": user,
+        "task_id": task_id,
+        "task_type": "detect_language",
+        "next_task_type": "detect_voice_segments",
+    }
+    return response
+
+
+def detect_voice_segments(file_path: str, user: str, task_id: str):
     try:
         audio = np.load(file_path)
         file_name = os.path.basename(file_path)
@@ -53,19 +68,36 @@ def detect_voice_segments(file_path: str, lang: str, user: str, task_id: str):
             os.path.join(WHISPER_DATA, f"{i}_{total}_{file_name}") for i in range(total)
         ]
         total_time = sum([e - s for s, e in timestamps])
-        for op, sa, (s, e) in zip(out_paths, split_audio, timestamps):
+
+        tasks: List[Task] = []
+        for i, op, sa, (s, e) in zip(range(total), out_paths, split_audio, timestamps):
             np.save(op, sa)
-            enqueue(
-                transcription_queue,
-                transcribe_segment,
-                op,
-                lang,
-                s,
-                e,
-                total_time,
-                user,
-                task_id,
+            if i == 0:
+                tasks.append(
+                    Task(
+                        task_id,
+                        partial(detect_language, op, user, task_id),
+                        language_queue,
+                    )
+                )
+            tasks.append(
+                Task(
+                    task_id,
+                    partial(
+                        transcribe_segment(
+                            segment_path=op,
+                            start_time_s=s,
+                            end_time_s=e,
+                            total_time=total_time,
+                            user=user,
+                            task_id=task_id,
+                        )
+                    ),
+                    transcription_queue,
+                    [tasks[0]],
+                )
             )
+        tasks[0].enqueue()
 
         response = {
             "segments_timestamps": timestamps,
@@ -82,33 +114,15 @@ def detect_voice_segments(file_path: str, lang: str, user: str, task_id: str):
         return response
 
 
-def detect_language(file_path: str, user: str, task_id: str):
-    audio = np.load(file_path)
-    lang = AIModels.get_language(audio)
-    enqueue(
-        split_queue,
-        detect_voice_segments,
-        file_path,
-        lang,
-        user,
-        task_id,
-    )
-    response = {
-        "detected_language": lang,
-        "user": user,
-        "task_id": task_id,
-        "task_type": "detect_language",
-        "next_task_type": "detect_voice_segments",
-    }
-    return response
-
-
 def convert_to_numpy(file_name: str, user: str, task_id: str):
     in_path = os.path.join(UPLOADS, file_name)
     out_path = os.path.join(WHISPER_DATA, file_name) + EXT
     audio = load_audio(in_path)
     np.save(out_path, audio)
-    enqueue(language_queue, detect_language, out_path, user, task_id)
+    task = Task(
+        task_id, partial(detect_voice_segments, out_path, user, task_id), split_queue
+    )
+    task.enqueue()
 
     response = {
         "user": user,

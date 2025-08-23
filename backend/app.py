@@ -1,10 +1,11 @@
 from flask import Flask, request, jsonify
 from flask_sock import Sock
-from queues import enqueue, process_queues, preprocess_queue
+from queues import process_queues, preprocess_queue
 from tasks import convert_to_numpy
 import threading
 from models import logger, AIModels
 from typing import Dict, Any
+from task import Task, partial
 
 
 app = Flask(__name__)
@@ -23,7 +24,12 @@ def dispatch():
     user = request.args["user"]
     task_id = request.args["task"]
     logger.info("Enqueuing %s task", convert_to_numpy.__name__)
-    enqueue(preprocess_queue, convert_to_numpy, file_name, user, task_id)
+    task = Task(
+        task_id,
+        partial(convert_to_numpy, file_name, user, task_id),
+        preprocess_queue,
+    )
+    task.enqueue()
     return jsonify({"status": "enqueued"}), 200
 
 
