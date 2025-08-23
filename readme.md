@@ -13,3 +13,4 @@
 - [ ] Round timestamps to 2 decimals
 - [ ] Replace "cpu" for DEVICE env variable and set build ARG
 - [ ] Cache all the models weights in the volume to avoid doing network requests
+- [ ] Change per task queues to per user queues

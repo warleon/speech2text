@@ -17,6 +17,7 @@ class Task:
         on_call: Union[partial, Callable[..., object]],
         queue: Queue,
         dependencies: List["Task"] = [],
+        metadata: Dict[str, Any] = {},
     ):
         self.id = (flow_id, Task.get_on_call_name(on_call))
         if isinstance(on_call, partial):
@@ -35,6 +36,14 @@ class Task:
         self.dependencies: Dict[Tuple[str, str], "Task"] = {}
         for dep in dependencies:
             self._add_dependency(dep)
+
+        # set metadata
+        self.metadata = {
+            **metadata,
+            "flow_id": self.id[0],
+            "task_type": self.id[1],
+            "queue": self.queue,
+        }
 
     @property
     def ready(self):
@@ -59,7 +68,7 @@ class Task:
         logger.info(
             f"Started task {self.id} execution with arguments {self.on_call.args} {self.on_call.keywords}"
         )
-        self.result = self.on_call()
+        self.result = self.on_call(**self.metadata)
         self.done = True
         self.queue.task_done()
         logger.info(f"Finished task {self.id} execution, returned: {self.result}")

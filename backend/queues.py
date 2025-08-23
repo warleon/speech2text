@@ -10,12 +10,14 @@ preprocess_queue = Queue()
 language_queue = Queue()
 split_queue = Queue()
 transcription_queue = Queue()
+default_queue = Queue()
 
 _ALL_QUEUES = [
     preprocess_queue,
     language_queue,
     split_queue,
     transcription_queue,
+    default_queue,
 ]
 
 
@@ -34,8 +36,8 @@ def process_queues(connections: Dict[str, Any]):
             result = task()
             jsonResult = json.dumps(result)
             try:
-                user = result["user"]
-                task_type = result["task_type"]
+                user = task.metadata["user"]
+                task_type = task.metadata["task_type"]
                 if not user in connections:
                     raise ConnectionError(
                         f"Error notifying user {user} about task {task_type}, connection not stablished",

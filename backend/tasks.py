@@ -13,15 +13,25 @@ WHISPER_DATA = UPLOADS
 EXT = ".npy"
 
 
+def diarize(**metadata):
+    pass
+
+
+def align_words(**metadata):
+    pass
+
+
+def collect_transciptions(**metadata):
+    pass
+
+
 def transcribe_segment(
     segment_path: str,
     lang: str,
     start_time_s: float,
     end_time_s: float,
     total_time: float,
-    user: str,
-    task_id: str,
-    **kwargs,
+    **metadata,
 ):
     audio = np.load(segment_path)
     text = AIModels.get_transcription(audio, lang)
@@ -33,37 +43,28 @@ def transcribe_segment(
     }
     response = {
         "transcription": result,
-        "user": user,
-        "task_type": "transcribe_segment",
-        "task_id": task_id,
-        "next_task_type": "",
     }
     return response
 
 
 def detect_language(
     file_path: str,
-    user: str,
-    task_id: str,
-    **kwargs,
+    **metadata,
 ):
     audio = np.load(file_path)
     lang = AIModels.get_language(audio)
     response = {
         "lang": lang,
-        "user": user,
-        "task_id": task_id,
+        "user": metadata["user"],
+        "task_id": metadata["flow_id"],
         "task_type": "detect_language",
-        "next_task_type": "detect_voice_segments",
     }
     return response
 
 
 def detect_voice_segments(
     file_path: str,
-    user: str,
-    task_id: str,
-    **kwargs,
+    **metadata,
 ):
     audio = np.load(file_path)
     file_name = os.path.basename(file_path)
@@ -84,36 +85,32 @@ def detect_voice_segments(
         if i == 0:
             tasks.append(
                 Task(
-                    task_id,
-                    partial(detect_language, op, user, task_id),
+                    metadata["flow_id"],
+                    partial(detect_language, op),
                     language_queue,
+                    **metadata,
                 )
             )
         tasks.append(
             Task(
-                task_id,
+                metadata["flow_id"],
                 partial(
                     transcribe_segment,
                     segment_path=op,
                     start_time_s=s,
                     end_time_s=e,
                     total_time=total_time,
-                    user=user,
-                    task_id=task_id,
                 ),
                 transcription_queue,
                 [tasks[0]],
             )
         )
     tasks[0].enqueue()
+    collect = Task(metadata["flow_id"], collect_transciptions, default_queue, tasks[1:])
 
     response = {
         "segments_timestamps": timestamps,
         "total_useful_time": total_time,
-        "user": user,
-        "task_id": task_id,
-        "task_type": "detect_voice_segments",
-        "next_task_type": "transcribe_segment",
     }
 
     return response
@@ -121,24 +118,23 @@ def detect_voice_segments(
 
 def convert_to_numpy(
     file_name: str,
-    user: str,
-    task_id: str,
-    **kwargs,
+    **metadata,
 ):
     in_path = os.path.join(UPLOADS, file_name)
     out_path = os.path.join(WHISPER_DATA, file_name) + EXT
     audio = load_audio(in_path)
     np.save(out_path, audio)
     task = Task(
-        task_id, partial(detect_voice_segments, out_path, user, task_id), split_queue
+        metadata["flow_id"],
+        partial(
+            detect_voice_segments,
+            out_path,
+        ),
+        split_queue,
+        metadata=metadata,
     )
     task.enqueue()
 
-    response = {
-        "user": user,
-        "task_id": task_id,
-        "task_type": "convert_to_numpy",
-        "next_task_type": "detect_language",
-    }
+    response = {}
 
     return response

@@ -22,15 +22,17 @@ def hello():
 def dispatch():
     file_name = request.args["file"]
     user = request.args["user"]
-    task_id = request.args["task"]
-    logger.info("Enqueuing %s task", convert_to_numpy.__name__)
+    flow_id = request.args["task"]
     task = Task(
-        task_id,
-        partial(convert_to_numpy, file_name, user, task_id),
+        flow_id,
+        partial(convert_to_numpy, file_name),
         preprocess_queue,
+        metadata={"user": user},
     )
-    task.enqueue()
-    return jsonify({"status": "enqueued"}), 200
+    if task.enqueue():
+        return jsonify({"status": "enqueued"}), 200
+    else:
+        return jsonify({"status": "failed to enqueue"}), 500
 
 
 @webSocket.route("/ws")
