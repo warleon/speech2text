@@ -21,7 +21,7 @@ def process_queues(connections: Dict[str, Any]):
     while True:
         queues = list(QUEUES.items())
         ql = len(queues)
-        logger.info(f"Iterating through {ql} queues")
+        # logger.info(f"Iterating through {ql} queues")
         for u, q in queues:
             try:
                 # TODO fix race condition

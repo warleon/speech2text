@@ -9,7 +9,7 @@ import {
   voiceSegmentsDetectionResponse,
 } from "@/types/backend";
 import { useEffect, useMemo, useState } from "react";
-import useWebSocket from "react-use-websocket";
+import useWebSocket, { ReadyState } from "react-use-websocket";
 import { usePrevious } from "./usePrevious";
 import { json } from "stream/consumers";
 
@@ -37,7 +37,11 @@ export function useBackendSubscription({
     const host = "localhost:8000";
     return `ws://${host}/ws?user=${user}`; //TODO: should be url sanitized
   }, [user /*window*/]);
-  const { lastMessage } = useWebSocket(connectionString);
+  const { lastMessage, readyState } = useWebSocket(connectionString, {
+    shouldReconnect: () => true,
+    reconnectInterval: 10_000,
+    reconnectAttempts: Infinity,
+  });
   const lastJsonMessage = useMemo(() => {
     if (lastMessage?.data)
       return JSON.parse(lastMessage.data) as backendResponse;
@@ -85,4 +89,9 @@ export function useBackendSubscription({
     onTranscription,
     prev,
   ]);
+
+  useEffect(() => {
+    if (readyState == ReadyState.OPEN)
+      console.log("WebSocket Connection Stablished Successfully");
+  }, [readyState]);
 }
