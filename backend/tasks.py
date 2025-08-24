@@ -123,7 +123,7 @@ def detect_voice_segments(
                 Task(
                     metadata["flow_id"],
                     partial(detect_language, op),
-                    language_queue,
+                    metadata["queue"],
                     metadata=metadata,
                 )
             )
@@ -137,7 +137,7 @@ def detect_voice_segments(
                     end_time_s=e,
                     total_time=total_time,
                 ),
-                transcription_queue,
+                metadata["queue"],
                 [tasks[0]],
                 metadata,
             )
@@ -147,7 +147,7 @@ def detect_voice_segments(
         Task(
             metadata["flow_id"],
             partial(collect_transciptions, full_audio_path=file_path),
-            default_queue,
+            metadata["queue"],
             tasks,
             metadata,
             unpack_single=False,
@@ -176,7 +176,7 @@ def convert_to_numpy(
             detect_voice_segments,
             out_path,
         ),
-        split_queue,
+        metadata["queue"],
         metadata=metadata,
     )
     task.enqueue()

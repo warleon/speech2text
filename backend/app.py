@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_sock import Sock
-from queues import process_queues, preprocess_queue
+from queues import process_queues, QUEUES
 from tasks import convert_to_numpy
 import threading
 from models import logger, AIModels
@@ -26,7 +26,7 @@ def dispatch():
     task = Task(
         flow_id,
         partial(convert_to_numpy, file_name),
-        preprocess_queue,
+        QUEUES[user],
         metadata={"user": user},
     )
     if task.enqueue():
