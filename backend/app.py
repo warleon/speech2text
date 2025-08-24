@@ -6,11 +6,12 @@ import threading
 from models import logger, AIModels
 from typing import Dict, Any
 from task import Task, partial
+from simple_websocket.ws import Server as WSServer
 
 
 app = Flask(__name__)
 webSocket = Sock(app)
-connections: Dict[str, Any] = {}
+connections: Dict[str, WSServer] = {}
 
 
 @app.route("/", methods=["GET"])
@@ -36,7 +37,7 @@ def dispatch():
 
 
 @webSocket.route("/ws")
-def websocket(conn):
+def websocket(conn: WSServer):
     user = request.args["user"]
     connections[user] = conn
 
@@ -47,7 +48,8 @@ def websocket(conn):
             if msg is None:
                 break
     finally:
-        connections.pop(user)
+        conn = connections.pop(user)
+        conn.close()
 
 
 # TODO add information endpoints to fetch progress information

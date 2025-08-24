@@ -8,7 +8,9 @@ import { FILE_KEY, FILE_NAME_KEY, TASK_KEY, USER_KEY } from "@/lib/constants";
 import { useBackendSubscription } from "./useBackendSubscription";
 import axios from "axios";
 import {
+  alignmentResponse,
   backendResponse,
+  diarizationResponse,
   languageDetectionResponse,
   segment,
   toNumpyResponse,
@@ -255,12 +257,20 @@ export function useFileJobs(
     },
     [addResult]
   );
+  const onAlignment = useCallback((task: alignmentResponse) => {
+    console.log("onAligment:", task);
+  }, []);
+  const onDiarization = useCallback((task: diarizationResponse) => {
+    console.log("onDiarization:", task);
+  }, []);
   useBackendSubscription({
     user: userId,
     onPreProcess,
     onLanguageFound,
     onSegmentation,
     onTranscription,
+    onAlignment,
+    onDiarization,
   });
 
   const runJob = useCallback(

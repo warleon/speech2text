@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     // Save file
     await writeFile(path.join(uploadDir, file_name), buffer);
     const { data: backendResponse } = await axios.get(
-      `${process.env.NEXT_PUBLIC_BASE_URL}/api/dispatch`,
+      `http://${process.env.NEXT_PUBLIC_HOST}/api/dispatch`,
       {
         params: {
           file: file_name,

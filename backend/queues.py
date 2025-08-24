@@ -23,7 +23,13 @@ def process_queues(connections: Dict[str, Any]):
             try:
                 task = dequeue(q)
                 result = task()
-                jsonResult = json.dumps(result)
+                jsonResult = json.dumps(
+                    {
+                        **result,
+                        "task_type": task.metadata["task_type"],
+                        "task_id": task.metadata["flow_id"],
+                    }
+                )
                 try:
                     user = task.metadata["user"]
                     task_type = task.metadata["task_type"]

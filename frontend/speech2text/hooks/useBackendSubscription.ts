@@ -1,6 +1,8 @@
 "use client";
 import {
+  alignmentResponse,
   backendResponse,
+  diarizationResponse,
   languageDetectionResponse,
   toNumpyResponse,
   transcriptionResponse,
@@ -17,6 +19,8 @@ interface Props {
   onLanguageFound?: (r: languageDetectionResponse) => void | Promise<void>;
   onSegmentation?: (r: voiceSegmentsDetectionResponse) => void | Promise<void>;
   onPreProcess?: (r: toNumpyResponse) => void | Promise<void>;
+  onAlignment?: (r: alignmentResponse) => void | Promise<void>;
+  onDiarization?: (r: diarizationResponse) => void | Promise<void>;
 }
 
 export function useBackendSubscription({
@@ -25,6 +29,8 @@ export function useBackendSubscription({
   onPreProcess,
   onSegmentation,
   onTranscription,
+  onAlignment,
+  onDiarization,
 }: Props) {
   //const window = useWindow();
   const connectionString = useMemo(() => {
@@ -57,11 +63,22 @@ export function useBackendSubscription({
         if (onTranscription)
           onTranscription(lastJsonMessage as transcriptionResponse);
         break;
+      case "diarize":
+        if (onDiarization)
+          onDiarization(lastJsonMessage as diarizationResponse);
+        break;
+      case "align_words":
+        if (onAlignment) onAlignment(lastJsonMessage as alignmentResponse);
+        break;
+      case "collect_transcriptions":
+        break; // no callback
       default:
         break;
     }
   }, [
     lastJsonMessage,
+    onAlignment,
+    onDiarization,
     onLanguageFound,
     onPreProcess,
     onSegmentation,

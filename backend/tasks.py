@@ -37,7 +37,7 @@ def align_words(segment: SingleSegment, audio_path: str, lang: str, **metadata):
 
 
 # needed to lauch diarize with align_words as dependencies
-def collect_transciptions(
+def collect_transcriptions(
     transcription: List[SingleSegment],
     segment_path: List[str],
     full_audio_path: str,
@@ -146,7 +146,7 @@ def detect_voice_segments(
     if len(tasks):
         Task(
             metadata["flow_id"],
-            partial(collect_transciptions, full_audio_path=file_path),
+            partial(collect_transcriptions, full_audio_path=file_path),
             metadata["queue"],
             tasks,
             metadata,
