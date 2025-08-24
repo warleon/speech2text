@@ -19,9 +19,13 @@ def dequeue(q: Queue):
 def process_queues(connections: Dict[str, Any]):
     logger.info("Spinning up working thread")
     while True:
-        for u, q in list(QUEUES.items()):
+        queues = list(QUEUES.items())
+        ql = len(queues)
+        logger.info(f"Iterating through {ql} queues")
+        for u, q in queues:
             try:
-                task = dequeue(q)
+                # TODO fix race condition
+                task = dequeue(q)  # may fail if currently empty and added new tasks
                 result = task()
                 jsonResult = json.dumps(
                     {
@@ -43,6 +47,7 @@ def process_queues(connections: Dict[str, Any]):
                 except Exception as e:
                     logger.exception(e)
             except Empty:
+                logger.info(f"Removing queue for user {u} due to lack of task")
                 QUEUES.pop(u, None)
             except Exception as e:
                 logger.error(f"Error on task {task.id}: {str(e)}")
