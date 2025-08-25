@@ -4,45 +4,17 @@
 import React, { useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+
 import { X, FileAudio, CheckCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Copy } from "lucide-react";
 import { Dropzone } from "@/components/ui/dropzone";
 import { useFileJobs } from "@/hooks/useFileJobs";
 import { CircularProgress } from "@/components/ui/circularProgress";
 import { backend_status } from "@/types/job";
+import { ResultsTable } from "@/components/ui/resultsTable";
 
 export default function WhisperS2TPage() {
   const { addFiles, jobs, removeJob } = useFileJobs();
-
-  const handleCopy = useCallback(
-    (jobId: string) => {
-      const tableText = [
-        "Start Time\tEnd Time\tText",
-        ...jobs
-          .find((v) => v.id === jobId)!
-          .result!.map((row) => `${row.start}\t${row.end}\t${row.text}`),
-      ].join("\n");
-
-      navigator.clipboard
-        .writeText(tableText)
-        .then(() => {
-          alert("Table copied to clipboard!");
-        })
-        .catch((err) => {
-          console.error("Failed to copy table:", err);
-        });
-    },
-    [jobs]
-  );
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-muted/30 to-background p-6">
@@ -138,43 +110,7 @@ export default function WhisperS2TPage() {
                           className="mt-2 overflow-x-auto rounded-xl border"
                           style={{ borderColor: job.color }}
                         >
-                          <Table>
-                            <TableHeader>
-                              <TableRow
-                                style={{
-                                  backgroundColor: `color-mix(in oklab, ${job.color} 12%, transparent)`,
-                                }}
-                              >
-                                <TableHead>Start Time (s)</TableHead>
-                                <TableHead>End Time (s)</TableHead>
-                                <TableHead>Text</TableHead>
-                                <TableHead>
-                                  <button
-                                    onClick={() => handleCopy(job.id)}
-                                    className="ml-2 text-gray-500 hover:text-gray-800"
-                                    title="Copy table"
-                                  >
-                                    <Copy size={16} />
-                                  </button>
-                                </TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {job.result.map((seg, idx) => (
-                                <TableRow key={idx}>
-                                  <TableCell className="whitespace-nowrap tabular-nums">
-                                    {seg.start}
-                                  </TableCell>
-                                  <TableCell className="whitespace-nowrap tabular-nums">
-                                    {seg.end}
-                                  </TableCell>
-                                  <TableCell className="whitespace-pre-wrap">
-                                    {seg.text}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
+                          <ResultsTable job={job} />
                         </div>
                       )}
                     </CardContent>
