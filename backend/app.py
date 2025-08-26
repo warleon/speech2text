@@ -25,7 +25,7 @@ def dispatch():
     flow_id = request.args["task"]
     task = Task(
         flow_id,
-        partial(convert_to_numpy, flow_id),
+        partial(convert_to_numpy),
         QUEUES[user],
         metadata={"user": user},
     )

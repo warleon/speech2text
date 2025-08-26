@@ -254,11 +254,7 @@ export function useFileJobs(
   );
   const onTranscription = useCallback(
     (task: transcriptionResponse) => {
-      setResult(
-        task.task_id,
-        task.transcription.text.join("|"),
-        task.transcription
-      );
+      setResult(task.task_id, task.transcription.text, task.transcription);
     },
     [setResult]
   );

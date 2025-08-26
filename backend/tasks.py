@@ -13,28 +13,33 @@ from pathlib import Path
 DATA = "/uploads"
 
 
-def getFilePath(flow_id: str, task_type: str, *args):
-    last = "_".join(
-        args,
-    )
-    name = ".".join([task_type, last])
+def getFilePath(flow_id: str, task_type: str, *args, ext="npy"):
+    name = task_type
+    last = "_".join([str(arg) for arg in args])
+    if last:
+        name = ".".join([name, last])
+    if ext:
+        name = ".".join([name, ext])
+
     path = Path(os.path.join(DATA, flow_id, name))
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
 
-def diarize(aligned: List[SingleAlignedSegment], audio_path: str, **metadata):
-    audio = np.load(audio_path)
+def diarize(aligned: List[SingleAlignedSegment], flow_id: str, **metadata):
+    inpath = getFilePath(flow_id, convert_to_numpy.__name__)
+    audio = np.load(inpath)
     diarization = AIModels.get_diarization(aligned, audio)
     response = {"diarization": diarization}
     return response
 
 
-def align_words(segment: SingleSegment, audio_path: str, lang: str, **metadata):
-    audio = np.load(audio_path)
-    aligned = AIModels.get_aligment(
-        segment, audio, lang
-    )  # may break because of segmented audio
+def align_words(
+    segment: SingleSegment, lang: str, i: int, total: int, flow_id: str, **metadata
+):
+    inpath = getFilePath(flow_id, detect_voice_segments.__name__, i, total)
+    audio = np.load(inpath)
+    aligned = AIModels.get_aligment(segment, audio, lang)
     result_len = len(aligned["segments"])
     if result_len != 1:
         raise ValueError(f"Expected segments to have a single segment got {result_len}")
@@ -46,25 +51,26 @@ def align_words(segment: SingleSegment, audio_path: str, lang: str, **metadata):
 
 # needed to lauch diarize with align_words as dependencies
 def collect_transcriptions(
-    transcription: List[SingleSegment],
-    segment_path: List[str],
-    full_audio_path: str,
     lang: List[str],
+    transcription: List[SingleSegment],
+    i: List[int],
+    total: List[int],
+    flow_id: str,  # injected through metadata
     **metadata,
 ):
     tasks: List[Task] = []
-    for segment, path, _lang in zip(transcription, segment_path, cycle(lang)):
+    for segment, _lang, _i, _total in zip(transcription, cycle(lang), i, total):
         tasks.append(
             Task(
-                metadata["flow_id"],
-                partial(align_words, segment, path, _lang),
+                flow_id,
+                partial(align_words, segment, _lang, _i, _total),
                 metadata["queue"],
                 metadata=metadata,
             )
         )
     Task(
-        metadata["flow_id"],
-        partial(diarize, audio_path=full_audio_path),
+        flow_id,
+        partial(diarize),
         metadata["queue"],
         tasks,
         metadata,
@@ -75,14 +81,17 @@ def collect_transcriptions(
 
 
 def transcribe_segment(
-    segment_path: str,
-    lang: str,
     start_time_s: float,
     end_time_s: float,
     total_time: float,
+    i: int,
+    total: int,
+    lang: str,
+    flow_id: str,
     **metadata,
 ):
-    audio = np.load(segment_path)
+    inpath = getFilePath(flow_id, detect_voice_segments.__name__, i, total)
+    audio = np.load(inpath)
     text = "".join(AIModels.get_transcription(audio, lang))
     result = {
         "text": text,
@@ -90,15 +99,22 @@ def transcribe_segment(
         "end": end_time_s,
         "total_time": total_time,
     }
-    response = {"transcription": result, "segment_path": segment_path}
+    response = {
+        "transcription": result,
+        "i": i,
+        "total": total,
+    }
     return response
 
 
 def detect_language(
-    file_path: str,
+    i: int,
+    total: int,
+    flow_id: str,
     **metadata,
 ):
-    audio = np.load(file_path)
+    inpath = getFilePath(flow_id, detect_voice_segments.__name__, i, total)
+    audio = np.load(inpath)
     lang = AIModels.get_language(audio)
     response = {
         "lang": lang,
@@ -107,11 +123,11 @@ def detect_language(
 
 
 def detect_voice_segments(
-    file_path: str,
+    flow_id: str,
     **metadata,
 ):
-    audio = np.load(file_path)
-    file_name = os.path.basename(file_path)
+    inpath = getFilePath(flow_id, convert_to_numpy.__name__)
+    audio = np.load(inpath)
     chunks = AIModels.get_voice_segments(audio)
     timestamps = [(chunk["start"], chunk["end"]) for chunk in chunks]
     split_audio = [
@@ -119,7 +135,8 @@ def detect_voice_segments(
     ]
     total = len(split_audio)
     out_paths = [
-        os.path.join(WHISPER_DATA, f"{i}_{total}_{file_name}") for i in range(total)
+        getFilePath(flow_id, detect_voice_segments.__name__, i, total)
+        for i in range(total)
     ]
     total_time = sum([e - s for s, e in timestamps])
 
@@ -129,21 +146,22 @@ def detect_voice_segments(
         if i == 0:
             tasks.append(
                 Task(
-                    metadata["flow_id"],
-                    partial(detect_language, op),
+                    flow_id,
+                    partial(detect_language, i, total),
                     metadata["queue"],
                     metadata=metadata,
                 )
             )
         tasks.append(
             Task(
-                metadata["flow_id"],
+                flow_id,
                 partial(
                     transcribe_segment,
-                    segment_path=op,
-                    start_time_s=s,
-                    end_time_s=e,
-                    total_time=total_time,
+                    s,
+                    e,
+                    total_time,
+                    i,
+                    total,
                 ),
                 metadata["queue"],
                 [tasks[0]],
@@ -153,8 +171,8 @@ def detect_voice_segments(
 
     if len(tasks):
         Task(
-            metadata["flow_id"],
-            partial(collect_transcriptions, full_audio_path=file_path),
+            flow_id,
+            partial(collect_transcriptions),
             metadata["queue"],
             tasks,
             metadata,
@@ -174,7 +192,7 @@ def convert_to_numpy(
     flow_id: str,
     **metadata,
 ):
-    in_path = getFilePath(flow_id, "upload")
+    in_path = getFilePath(flow_id, "upload", ext="")
     out_path = getFilePath(flow_id, convert_to_numpy.__name__)
     audio = load_audio(in_path)
     np.save(out_path, audio)
@@ -182,7 +200,6 @@ def convert_to_numpy(
         flow_id,
         partial(
             detect_voice_segments,
-            out_path,
         ),
         metadata["queue"],
         metadata=metadata,
