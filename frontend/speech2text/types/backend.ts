@@ -58,6 +58,8 @@ export type collectTranscriptionsResponse = backendResponse;
 
 export type transcriptionResponse = baseTaskResponse & {
   transcription: segment;
+  i: number;
+  total: number;
 };
 
 export type languageDetectionResponse = baseTaskResponse & {

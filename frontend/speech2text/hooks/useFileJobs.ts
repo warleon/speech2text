@@ -18,6 +18,7 @@ import {
   transcriptionResponse,
   voiceSegmentsDetectionResponse,
 } from "@/types/backend";
+import { useTrigger } from "./useTrigger";
 
 interface Props {
   fakeProgressDuration: number;
@@ -129,16 +130,16 @@ export function useFileJobs(
 
   const setResult = useCallback(
     (jid: string, rid: string, segment: segment | diarizedSegment) => {
-      setJobs((prev) =>
-        prev.map((j) => {
+      setJobs((prev) => {
+        return prev.map((j) => {
           return j.id === jid
             ? {
                 ...j,
                 result: { ...j.result, [rid]: segment },
               }
             : j;
-        })
-      );
+        });
+      });
     },
     [setJobs]
   );
@@ -254,6 +255,7 @@ export function useFileJobs(
   );
   const onTranscription = useCallback(
     (task: transcriptionResponse) => {
+      console.log("On transcribe segment callback", task);
       setResult(task.task_id, task.transcription.text, task.transcription);
     },
     [setResult]
@@ -296,12 +298,14 @@ export function useFileJobs(
   const process = useCallback(() => {
     for (const job of jobs) {
       if (job.removed || job.done || job.error) continue;
-      if (job.result && job.result[0]) {
-        const total = job.result[0].total_time;
+      if (job.result) {
         let sub_total = 0;
-        for (const res of Object.values(job.result)) {
-          sub_total += res.end - res.start;
+        let total = 0;
+        for (const result of Object.values(job.result)) {
+          total = result.total_time;
+          sub_total += result.end - result.start;
         }
+        console.log("Progress is", sub_total, "of", total);
         if (total - sub_total < 0.1) {
           doneJob(job.id);
           continue;
