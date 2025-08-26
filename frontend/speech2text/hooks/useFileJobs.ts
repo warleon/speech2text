@@ -11,6 +11,7 @@ import {
   alignmentResponse,
   backendResponse,
   diarizationResponse,
+  diarizedSegment,
   languageDetectionResponse,
   segment,
   toNumpyResponse,
@@ -126,14 +127,14 @@ export function useFileJobs(
     [setJobs]
   );
 
-  const addResult = useCallback(
-    (id: string, segment: segment) => {
+  const setResult = useCallback(
+    (jid: string, rid: string, segment: segment | diarizedSegment) => {
       setJobs((prev) =>
         prev.map((j) => {
-          return j.id === id
+          return j.id === jid
             ? {
                 ...j,
-                result: j.result ? [...j.result, segment] : [segment],
+                result: { ...j.result, [rid]: segment },
               }
             : j;
         })
@@ -233,13 +234,6 @@ export function useFileJobs(
   const onPreProcess = useCallback(
     (task: toNumpyResponse) => {
       setStatus(task.task_id, "processing", 100);
-      progressJob(task.task_id, "detecting_language");
-    },
-    [progressJob, setStatus]
-  );
-  const onLanguageFound = useCallback(
-    (task: languageDetectionResponse) => {
-      setStatus(task.task_id, "detecting_language", 100);
       progressJob(task.task_id, "fragmenting");
     },
     [progressJob, setStatus]
@@ -247,22 +241,31 @@ export function useFileJobs(
   const onSegmentation = useCallback(
     (task: voiceSegmentsDetectionResponse) => {
       setStatus(task.task_id, "fragmenting", 100);
+      progressJob(task.task_id, "detecting_language");
+    },
+    [progressJob, setStatus]
+  );
+  const onLanguageFound = useCallback(
+    (task: languageDetectionResponse) => {
+      setStatus(task.task_id, "detecting_language", 100);
       setStatus(task.task_id, "transcribing", 1);
     },
     [setStatus]
   );
   const onTranscription = useCallback(
     (task: transcriptionResponse) => {
-      addResult(task.task_id, task.transcription);
+      setResult(
+        task.task_id,
+        task.transcription.text.join("|"),
+        task.transcription
+      );
     },
-    [addResult]
+    [setResult]
   );
   const onAlignment = useCallback((task: alignmentResponse) => {
     console.log("onAligment:", task);
   }, []);
-  const onDiarization = useCallback((task: diarizationResponse) => {
-    console.log("onDiarization:", task);
-  }, []);
+  const onDiarization = useCallback((task: diarizationResponse) => {}, []);
   useBackendSubscription({
     user: userId,
     onPreProcess,
@@ -280,7 +283,6 @@ export function useFileJobs(
 
       const formData = new FormData();
       formData.append(FILE_KEY, job.file);
-      formData.append(FILE_NAME_KEY, job.id);
       formData.append(USER_KEY, userId);
       formData.append(TASK_KEY, id);
 
@@ -301,7 +303,7 @@ export function useFileJobs(
       if (job.result && job.result[0]) {
         const total = job.result[0].total_time;
         let sub_total = 0;
-        for (const res of job.result) {
+        for (const res of Object.values(job.result)) {
           sub_total += res.end - res.start;
         }
         if (total - sub_total < 0.1) {

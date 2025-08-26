@@ -5,6 +5,8 @@ from models import logger
 import json
 from collections import defaultdict
 from task import Task
+import threading
+
 
 QUEUES: Dict[str, Queue] = defaultdict(Queue)
 
@@ -19,10 +21,8 @@ def dequeue(q: Queue):
 def process_queues(connections: Dict[str, Any]):
     logger.info("Spinning up working thread")
     while True:
-        queues = list(QUEUES.items())
-        ql = len(queues)
-        # logger.info(f"Iterating through {ql} queues")
-        for u, q in queues:
+
+        for u, q in list(QUEUES.items()):
             try:
                 # TODO fix race condition
                 task = dequeue(q)  # may fail if currently empty and added new tasks
@@ -48,7 +48,7 @@ def process_queues(connections: Dict[str, Any]):
                     logger.exception(e)
             except Empty:
                 logger.info(f"Removing queue for user {u} due to lack of task")
-                QUEUES.pop(u, None)
+                QUEUES.pop(u)
             except Exception as e:
                 logger.error(f"Error on task {task.id}: {str(e)}")
                 logger.exception(e)

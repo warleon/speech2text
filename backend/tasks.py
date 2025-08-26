@@ -5,14 +5,22 @@ from whisperx.types import SingleSegment, SingleAlignedSegment
 import numpy as np
 from queues import *
 from models import AIModels
-from models import logger
 from task import Task, partial, List
 from itertools import cycle
+from pathlib import Path
 
 
-UPLOADS = "/uploads"
-WHISPER_DATA = UPLOADS
-EXT = ".npy"
+DATA = "/uploads"
+
+
+def getFilePath(flow_id: str, task_type: str, *args):
+    last = "_".join(
+        args,
+    )
+    name = ".".join([task_type, last])
+    path = Path(os.path.join(DATA, flow_id, name))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def diarize(aligned: List[SingleAlignedSegment], audio_path: str, **metadata):
@@ -163,15 +171,15 @@ def detect_voice_segments(
 
 
 def convert_to_numpy(
-    file_name: str,
+    flow_id: str,
     **metadata,
 ):
-    in_path = os.path.join(UPLOADS, file_name)
-    out_path = os.path.join(WHISPER_DATA, file_name) + EXT
+    in_path = getFilePath(flow_id, "upload")
+    out_path = getFilePath(flow_id, convert_to_numpy.__name__)
     audio = load_audio(in_path)
     np.save(out_path, audio)
     task = Task(
-        metadata["flow_id"],
+        flow_id,
         partial(
             detect_voice_segments,
             out_path,

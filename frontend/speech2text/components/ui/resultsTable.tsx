@@ -9,6 +9,7 @@ import {
 } from "./table";
 import { FileJob } from "@/types/job";
 import { useCallback } from "react";
+import { ThreeDotWave } from "./threeDotWave";
 
 interface Props {
   job: FileJob;
@@ -17,7 +18,7 @@ export function ResultsTable({ job }: Props) {
   const handleCopy = useCallback(() => {
     const tableText = [
       "Start Time\tEnd Time\tText",
-      ...(job.result?.map(
+      ...(Object.values(job.result!).map(
         (row) => `${row.start.toFixed(2)}\t${row.end.toFixed(2)}\t${row.text}`
       ) ?? []),
     ].join("\n");
@@ -41,6 +42,7 @@ export function ResultsTable({ job }: Props) {
         >
           <TableHead>Start Time (s)</TableHead>
           <TableHead>End Time (s)</TableHead>
+          <TableHead>Speaker</TableHead>
           <TableHead>Text</TableHead>
           <TableHead>
             <button
@@ -55,13 +57,17 @@ export function ResultsTable({ job }: Props) {
       </TableHeader>
       <TableBody>
         {job.result &&
-          job.result.map((seg, idx) => (
-            <TableRow key={idx}>
+          Object.entries(job.result).map(([k, seg]) => (
+            <TableRow key={k}>
               <TableCell className="whitespace-nowrap tabular-nums">
                 {seg.start.toFixed(2)}
               </TableCell>
               <TableCell className="whitespace-nowrap tabular-nums">
                 {seg.end.toFixed(2)}
+              </TableCell>
+              <TableCell className="whitespace-nowrap tabular-nums">
+                {!("speaker" in seg && seg.speaker) && <ThreeDotWave />}
+                {"speaker" in seg && seg.speaker && seg.speaker}
               </TableCell>
               <TableCell className="whitespace-pre-wrap">{seg.text}</TableCell>
             </TableRow>

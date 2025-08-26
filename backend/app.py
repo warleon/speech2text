@@ -21,12 +21,11 @@ def hello():
 
 @app.route("/dispatch", methods=["GET"])
 def dispatch():
-    file_name = request.args["file"]
     user = request.args["user"]
     flow_id = request.args["task"]
     task = Task(
         flow_id,
-        partial(convert_to_numpy, file_name),
+        partial(convert_to_numpy, flow_id),
         QUEUES[user],
         metadata={"user": user},
     )
@@ -34,6 +33,11 @@ def dispatch():
         return jsonify({"status": "enqueued"}), 200
     else:
         return jsonify({"status": "failed to enqueue"}), 500
+
+
+@app.route("/status", methods=["GET"])
+def status():
+    flow_id = request.args["task"]
 
 
 @webSocket.route("/ws")
@@ -50,9 +54,6 @@ def websocket(conn: WSServer):
     finally:
         conn = connections.pop(user)
         conn.close()
-
-
-# TODO add information endpoints to fetch progress information
 
 
 if __name__ == "__main__":

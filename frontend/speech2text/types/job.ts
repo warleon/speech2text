@@ -1,5 +1,5 @@
 // Types returned by your Flask API
-import { segment } from "@/types/backend";
+import { diarizedSegment, segment } from "@/types/backend";
 
 export type backend_status =
   | "uploading"
@@ -18,7 +18,7 @@ export type FileJob = {
   fileName: string;
   fileSize: string;
   color: string; // hsl string
-  result?: segment[];
+  result?: Record<string, segment | diarizedSegment>;
   status: {
     [key in backend_status]: number;
   };

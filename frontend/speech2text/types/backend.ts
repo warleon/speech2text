@@ -18,10 +18,13 @@ export interface charSegment {
   score: number;
 }
 
-type alignedSegment = segment & {
+export type alignedSegment = segment & {
   words: wordSegment[];
   chars?: charSegment[];
 };
+
+type speaker = { speaker: string };
+export type diarizedSegment = alignedSegment & speaker;
 
 type task_type =
   | "diarize"
@@ -38,15 +41,12 @@ type baseTaskResponse = {
   task_type: task_type;
 };
 
-type speaker = { speaker: string };
-
 export type diarizationResponse = baseTaskResponse & {
   diarization: {
-    segments: alignedSegment &
-      speaker & {
-        words: (wordSegment & speaker)[];
-        chars?: (charSegment & speaker)[];
-      };
+    segments: diarizedSegment & {
+      words: (wordSegment & speaker)[];
+      chars?: (charSegment & speaker)[];
+    };
   };
 };
 

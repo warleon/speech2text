@@ -1,20 +1,20 @@
 import { NextResponse } from "next/server";
-import { writeFile } from "fs/promises";
-import path from "path";
+import { writeFile, mkdir } from "fs/promises";
+import path, { dirname } from "path";
 import { FILE_KEY, FILE_NAME_KEY, TASK_KEY, USER_KEY } from "@/lib/constants";
 import axios from "axios";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 
+// TODO  sync expectations from backend
 export async function POST(req: Request) {
   try {
     const formData = await req.formData();
     const file = formData.get(FILE_KEY) as File | null;
-    const file_name = formData.get(FILE_NAME_KEY) as string | null;
     const user = formData.get(USER_KEY) as string | null;
     const task = formData.get(TASK_KEY) as string | null;
 
-    if (!file || !file_name) {
+    if (!file || !task) {
       return NextResponse.json(
         {
           error:
@@ -29,12 +29,13 @@ export async function POST(req: Request) {
     const buffer = Buffer.from(bytes);
 
     // Save file
-    await writeFile(path.join(uploadDir, file_name), buffer);
+    const file_path = path.join(uploadDir, task!, "upload");
+    await mkdir(dirname(file_path), { recursive: true });
+    await writeFile(file_path, buffer);
     const { data: backendResponse } = await axios.get(
       `http://${process.env.NEXT_PUBLIC_HOST}/api/dispatch`,
       {
         params: {
-          file: file_name,
           user: user,
           task: task,
         },
