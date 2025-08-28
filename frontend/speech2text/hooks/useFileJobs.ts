@@ -1,15 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { randomColor } from "@/lib/utils";
 import { backend_status, FileJob } from "@/types/job";
-import { useCallback, useMemo, useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { usePersistentId } from "./usePersistentId";
 import { usePersistentJobs } from "./usePersistendJobs";
-import { FILE_KEY, FILE_NAME_KEY, TASK_KEY, USER_KEY } from "@/lib/constants";
+import { FILE_KEY, TASK_KEY, USER_KEY } from "@/lib/constants";
 import { useBackendSubscription } from "./useBackendSubscription";
 import axios from "axios";
 import {
   alignmentResponse,
-  backendResponse,
   diarizationResponse,
   diarizedSegment,
   languageDetectionResponse,
@@ -18,7 +17,6 @@ import {
   transcriptionResponse,
   voiceSegmentsDetectionResponse,
 } from "@/types/backend";
-import { useTrigger } from "./useTrigger";
 
 interface Props {
   fakeProgressDuration: number;
