@@ -1,9 +1,10 @@
 from transformers import Wav2Vec2ForCTC
 from whisperx.asr import WhisperModel
 from whisperx.audio import SAMPLE_RATE, CHUNK_LENGTH, N_SAMPLES, log_mel_spectrogram
-from whisperx import vad
-from whisperx.vad import VoiceActivitySegmentation, merge_chunks
-from whisperx.types import SingleSegment, SingleAlignedSegment
+from whisperx import asr
+from whisperx.vads.pyannote import VoiceActivitySegmentation
+from whisperx.vads.vad import Vad
+from whisperx.schema import SingleSegment, SingleAlignedSegment
 from whisperx.diarize import DiarizationPipeline, assign_word_speakers
 from whisperx.alignment import (
     DEFAULT_ALIGN_MODELS_HF,
@@ -31,6 +32,7 @@ logger.setLevel(DEBUG)
 
 
 class AIModels:
+    device = "cpu"
     _lock = threading.Lock()
     whisper_model: WhisperModel = None
     vad_model: VoiceActivitySegmentation = None
@@ -65,6 +67,8 @@ class AIModels:
             "max_new_tokens": None,
             "clip_timestamps": None,
             "hallucination_silence_threshold": None,
+            "multilingual": False,
+            "hotwords": None,
         }
     )
     vad_args = {
@@ -86,13 +90,13 @@ class AIModels:
 
     @classmethod
     def _load_vad(cls, token: str):
-        vad_dir = os.path.dirname(os.path.abspath(vad.__file__))
+        vad_dir = os.path.dirname(os.path.abspath(asr.__file__))
         # Vad model already locally available, downloaded alongside whisperx
         model_fp = os.path.join(vad_dir, "assets", "pytorch_model.bin")
         model_fp = os.path.abspath(model_fp)  # Ensure the path is absolute
         vad_model = Model.from_pretrained(model_fp, use_auth_token=token)
         vad_pipeline = VoiceActivitySegmentation(
-            segmentation=vad_model, device=torch.device("cpu")
+            segmentation=vad_model, device=torch.device(cls.device)
         )
         cls.vad_model = vad_pipeline.instantiate(AIModels.vad_args)
 
@@ -106,16 +110,14 @@ class AIModels:
     def _load_whisper(cls, cache_root: str):
         cls.whisper_model = WhisperModel(
             "large-v2",
-            device="cpu",
+            device=cls.device,
             compute_type="int8",
             download_root=cache_root,
         )
 
     @classmethod
     def _load_diarization_pipeline(cls, token: str):
-        cls.diarization_pipeline = DiarizationPipeline(
-            use_auth_token=token, device="cpu"
-        )
+        cls.diarization_pipeline = DiarizationPipeline(token=token, device=cls.device)
 
     @classmethod
     def load_models(cls):
@@ -145,7 +147,7 @@ class AIModels:
             }
         )
         logger.info("Perform segment merging")
-        return merge_chunks(segments, CHUNK_LENGTH)
+        return Vad.merge_chunks(segments, CHUNK_LENGTH)
 
     @classmethod
     def get_transcription(cls, audio: np.ndarray, lang: str):
@@ -198,7 +200,9 @@ class AIModels:
                 f"Language {lang} is not supported by the Aligment model, ask for support"
             )
         if not lang in cls.align_models:
-            cls.align_models[lang] = load_align_model(language_code=lang, device="cpu")
+            cls.align_models[lang] = load_align_model(
+                language_code=lang, device=cls.device
+            )
         return cls.align_models[lang]
 
     @classmethod
@@ -215,7 +219,7 @@ class AIModels:
             model,
             metadata,
             audio_segment,
-            "cpu",
+            cls.device,
             return_char_alignments=char_level,
         )
 

@@ -1,14 +1,13 @@
 import os
 from whisperx import load_audio
 from whisperx.audio import SAMPLE_RATE
-from whisperx.types import SingleSegment, SingleAlignedSegment
+from whisperx.schema import SingleSegment, SingleAlignedSegment
 import numpy as np
 from queues import *
 from models import AIModels
 from task import Task, partial, List
 from itertools import cycle
 from pathlib import Path
-
 
 DATA = "/uploads"
 

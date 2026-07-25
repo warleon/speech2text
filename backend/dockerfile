@@ -30,9 +30,9 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 #RUN ffmpeg -version && ffprobe -version
 
-COPY requirements.txt .
-
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel Cython
+
+COPY requirements.txt .
 
 RUN pip install \
     --no-cache-dir \
