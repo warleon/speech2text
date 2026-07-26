@@ -1,3 +1,5 @@
+from os import path
+
 from transformers import Wav2Vec2ForCTC
 from whisperx.asr import WhisperModel
 from whisperx.audio import SAMPLE_RATE, CHUNK_LENGTH, N_SAMPLES, log_mel_spectrogram
@@ -14,7 +16,7 @@ from whisperx.alignment import (
 )
 import faster_whisper
 from faster_whisper.tokenizer import _LANGUAGE_CODES, _TASKS, Tokenizer
-from pyannote.audio.core.model import Model
+from whisperx.vads.pyannote import load_vad_model as pyannote_load_vad_model
 import torch
 import tokenizers
 import threading
@@ -23,6 +25,7 @@ import logging
 from logging import DEBUG
 from typing import Dict, Any, Tuple, List
 import os
+from utils import sliding_window_to_segments
 
 logging.basicConfig(level=logging.NOTSET)
 
@@ -86,7 +89,8 @@ class AIModels:
                 "HUGGING_FACE_TOKEN not set, value:{0}".format(HUGGING_FACE_TOKEN)
             )
         MODELS_DOWNLOAD_PATH = os.environ.get("MODELS_DOWNLOAD_PATH")
-        return HUGGING_FACE_TOKEN, MODELS_DOWNLOAD_PATH
+        OFFLINE_MODELS = os.environ.get("OFFLINE_MODELS")
+        return HUGGING_FACE_TOKEN, MODELS_DOWNLOAD_PATH, OFFLINE_MODELS
 
     @classmethod
     def _load_vad(cls, token: str):
@@ -94,60 +98,83 @@ class AIModels:
         # Vad model already locally available, downloaded alongside whisperx
         model_fp = os.path.join(vad_dir, "assets", "pytorch_model.bin")
         model_fp = os.path.abspath(model_fp)  # Ensure the path is absolute
-        vad_model = Model.from_pretrained(model_fp, use_auth_token=token)
-        vad_pipeline = VoiceActivitySegmentation(
-            segmentation=vad_model, device=torch.device(cls.device)
-        )
-        cls.vad_model = vad_pipeline.instantiate(AIModels.vad_args)
+        cls.vad_model = pyannote_load_vad_model(cls.device,token=token,model_fp=model_fp)
+        #vad_pipeline = VoiceActivitySegmentation(token=token,device=torch.device(cls.device))
+        #cls.vad_model = vad_pipeline.apply
 
     @classmethod
-    def _load_base_tokenizer(cls, token: str):
-        cls.base_tokenizer = tokenizers.Tokenizer.from_pretrained(
-            "openai/whisper-tiny", "main", token
+    def _load_base_tokenizer(cls, token: str, cache_root: str, offline_models: str):
+        model_fp = os.path.join(
+            cache_root,
+            "openai",
+            "whisper-tiny",
+            "169d4a4341b33bc18d8881c4b69c2e104e1cc0af",
+            "tokenizer.json",
         )
+        model_fp = os.path.abspath(model_fp)  # Ensure the path is absolute
+
+        print(f"Checking for tokenizer at: {model_fp}")
+        if os.path.exists(model_fp):
+            cls.base_tokenizer = tokenizers.Tokenizer.from_file(model_fp)
+        else:
+            cls.base_tokenizer = tokenizers.Tokenizer.from_pretrained(
+                "openai/whisper-tiny",
+                "main",
+                token,
+            )
 
     @classmethod
-    def _load_whisper(cls, cache_root: str):
+    def _load_whisper(cls, cache_root: str, offline_models: str):
         cls.whisper_model = WhisperModel(
             "large-v2",
             device=cls.device,
             compute_type="int8",
             download_root=cache_root,
+            local_files_only=True if offline_models == "1" else False,
         )
 
     @classmethod
-    def _load_diarization_pipeline(cls, token: str):
-        cls.diarization_pipeline = DiarizationPipeline(token=token, device=cls.device)
+    def _load_diarization_pipeline(cls, token: str, cache_root: str):
+        cls.diarization_pipeline = DiarizationPipeline(
+            token=token, device=cls.device, cache_dir=cache_root
+        )
 
     @classmethod
     def load_models(cls):
         with cls._lock:
-            token, cache_root = cls._get_env_vars()
+            token, cache_root, offline_models = cls._get_env_vars()
             if not cls.base_tokenizer:
-                cls._load_base_tokenizer(token)
+                cls._load_base_tokenizer(token, cache_root, offline_models)
             if not cls.vad_model:
                 cls._load_vad(token)
             if not cls.whisper_model:
-                cls._load_whisper(cache_root)
+                cls._load_whisper(cache_root, offline_models)
             if not cls.diarization_pipeline:
-                cls._load_diarization_pipeline(token)
+                cls._load_diarization_pipeline(token, cache_root)
 
     @classmethod
     def get_voice_segments(cls, audio: np.ndarray):
         logger.info("Check for vad model instance")
-        if not cls.vad_model or not cls.vad_model.instantiated:
+        if not cls.vad_model:
             logger.error("vad model instance not found")
             raise ValueError(f"{__class__.__name__}.vad_model has not been initialized")
         logger.info("vad model instance found")
-        logger.info("Perform vad model inference")
-        segments = cls.vad_model(
+        logger.info("start to perform vad model inference")
+        #segments = cls.vad_model(audio)
+        vad_inference_output = cls.vad_model(
             {
                 "waveform": torch.from_numpy(audio).unsqueeze(0),
                 "sample_rate": SAMPLE_RATE,
             }
         )
-        logger.info("Perform segment merging")
-        return Vad.merge_chunks(segments, CHUNK_LENGTH)
+        logger.info("done performing vad model inference")
+        logger.info(type(vad_inference_output))
+        segments = sliding_window_to_segments(vad_inference_output)
+        
+        logger.info("start to perform segment merging")
+        merged_chunks = Vad.merge_chunks(segments, CHUNK_LENGTH,0,0)
+        logger.info("done performing segment merging")
+        return merged_chunks
 
     @classmethod
     def get_transcription(cls, audio: np.ndarray, lang: str):

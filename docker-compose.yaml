@@ -4,7 +4,7 @@ services:
       context: ./backend
       args:
         - HUGGING_FACE_TOKEN=${HUGGING_FACE_TOKEN}
-        - MODELS_DOWNLOAD_PATH=/models
+        - OFFLINE_MODELS=0
     restart: unless-stopped
     environment:
       - HUGGING_FACE_TOKEN=${HUGGING_FACE_TOKEN}
@@ -13,7 +13,6 @@ services:
     volumes:
       - ./backend/:/app
       - shared-uploads:/uploads
-      - models-downloads:/models
     command: python3 app.py
     ports:
       - 8000:8000
@@ -47,9 +46,3 @@ volumes:
       type: none
       o: bind
       device: ./frontend/speech2text/uploads
-  models-downloads:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./models

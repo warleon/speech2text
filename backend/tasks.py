@@ -26,7 +26,7 @@ def getFilePath(flow_id: str, task_type: str, *args, ext="npy"):
 
 
 def diarize(aligned: List[SingleAlignedSegment], flow_id: str, **metadata):
-    inpath = getFilePath(flow_id, convert_to_numpy.__name__)
+    inpath = getFilePath(flow_id, "audio",ext="npy")
     audio = np.load(inpath)
     diarization = AIModels.get_diarization(aligned, audio)
     response = {"diarization": diarization}
@@ -125,7 +125,7 @@ def detect_voice_segments(
     flow_id: str,
     **metadata,
 ):
-    inpath = getFilePath(flow_id, convert_to_numpy.__name__)
+    inpath = getFilePath(flow_id, "audio", ext="npy")
     audio = np.load(inpath)
     chunks = AIModels.get_voice_segments(audio)
     timestamps = [(chunk["start"], chunk["end"]) for chunk in chunks]
@@ -192,7 +192,7 @@ def convert_to_numpy(
     **metadata,
 ):
     in_path = getFilePath(flow_id, "upload", ext="")
-    out_path = getFilePath(flow_id, convert_to_numpy.__name__)
+    out_path = getFilePath(flow_id, "audio", ext="npy")
     audio = load_audio(in_path)
     np.save(out_path, audio)
     task = Task(

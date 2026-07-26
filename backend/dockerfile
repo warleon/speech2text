@@ -1,4 +1,4 @@
-#FROM ghcr.io/opennmt/ctranslate2:4.4.0-ubuntu22.04-cuda12.2
+# syntax=docker/dockerfile:1.7-labs
 FROM ghcr.io/opennmt/ctranslate2:4.6.2-ubuntu22.04-cuda12.2
 
 # Set working directory
@@ -42,19 +42,32 @@ RUN pip install \
 RUN pip install --no-cache-dir \
     -U transformers
 
-COPY models.py .
 
 # Pass Hugging Face token as build arg and set as env
 ARG HUGGING_FACE_TOKEN
-ARG MODELS_DOWNLOAD_PATH
+ARG OFFLINE_MODELS
+
+ENV MODELS_DOWNLOAD_PATH=/app/models
+ENV OFFLINE_MODELS=${OFFLINE_MODELS}
+
+# copy the models
+#COPY models ${MODELS_DOWNLOAD_PATH}
+#COPY models.py .
 
 ENV HUGGING_FACE_TOKEN=${HUGGING_FACE_TOKEN}
-ENV MODELS_DOWNLOAD_PATH=${MODELS_DOWNLOAD_PATH}
 ENV TORCH_HOME="${MODELS_DOWNLOAD_PATH}/torch"
 ENV XDG_CACHE_HOME="${MODELS_DOWNLOAD_PATH}/xdg"
 ENV PYANNOTE_CACHE="${MODELS_DOWNLOAD_PATH}/pyannote"
 
+ENV HF_HOME=${MODELS_DOWNLOAD_PATH}
+ENV HUGGINGFACE_HUB_CACHE=${MODELS_DOWNLOAD_PATH}
+ENV TRANSFORMERS_CACHE=${MODELS_DOWNLOAD_PATH}
+
+# disable all network access from huggingface
+ENV HF_HUB_OFFLINE=${OFFLINE_MODELS}
+ENV TRANSFORMERS_OFFLINE=${OFFLINE_MODELS}
+
 # Download model at build time
-RUN python3 models.py
+RUN --mount=type=bind,target=.,readwrite  python3 models.py
 
 ENTRYPOINT []
