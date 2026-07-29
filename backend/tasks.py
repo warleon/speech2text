@@ -8,6 +8,7 @@ from models import AIModels
 from task import Task, partial, List
 from itertools import cycle
 from pathlib import Path
+import json
 
 DATA = "/uploads"
 
@@ -27,9 +28,21 @@ def getFilePath(flow_id: str, task_type: str, *args, ext="npy"):
 
 def diarize(aligned: List[SingleAlignedSegment], flow_id: str, **metadata):
     inpath = getFilePath(flow_id, "audio",ext="npy")
+    cachepath = getFilePath(flow_id, diarize.__name__,ext="json")
+    try:
+        with open(cachepath, "r", encoding="utf-8") as file:
+            response = json.load(file)
+            return response
+    except Exception:
+        pass
+
     audio = np.load(inpath)
     diarization = AIModels.get_diarization(aligned, audio)
     response = {"diarization": diarization}
+
+    with open(cachepath, "w", encoding="utf-8") as file:
+        json.dump(response, file)
+
     return response
 
 
@@ -37,14 +50,23 @@ def align_words(
     segment: SingleSegment, lang: str, i: int, total: int, flow_id: str, **metadata
 ):
     inpath = getFilePath(flow_id, detect_voice_segments.__name__, i, total)
+    cachepath = getFilePath(flow_id, align_words.__name__, i, total,ext="json")
+    try:
+        with open(cachepath, "r", encoding="utf-8") as file:
+            response = json.load(file)
+            return response
+    except Exception:
+        pass
+
     audio = np.load(inpath)
     aligned = AIModels.get_aligment(segment, audio, lang)
-    result_len = len(aligned["segments"])
-    if result_len != 1:
-        raise ValueError(f"Expected segments to have a single segment got {result_len}")
     response = {
-        "aligned": aligned["segments"][0]
+        "aligned": aligned 
     }  # timestamps may be shifted because of segmented audio
+
+    with open(cachepath, "w", encoding="utf-8") as file:
+        json.dump(response, file)
+
     return response
 
 
@@ -90,8 +112,17 @@ def transcribe_segment(
     **metadata,
 ):
     inpath = getFilePath(flow_id, detect_voice_segments.__name__, i, total)
+    cachepath = getFilePath(flow_id, transcribe_segment.__name__, i, total,ext="json")
+
+    try:
+        with open(cachepath, "r", encoding="utf-8") as file:
+            response = json.load(file)
+            return response
+    except Exception:
+        pass
+
     audio = np.load(inpath)
-    text = "".join(AIModels.get_transcription(audio, lang))
+    text = "".join(AIModels.get_transcription(audio, lang)["text"])
     result = {
         "text": text,
         "start": start_time_s,
@@ -103,6 +134,10 @@ def transcribe_segment(
         "i": i,
         "total": total,
     }
+
+    with open(cachepath, "w", encoding="utf-8") as file:
+        json.dump(response, file)
+
     return response
 
 
@@ -113,11 +148,24 @@ def detect_language(
     **metadata,
 ):
     inpath = getFilePath(flow_id, detect_voice_segments.__name__, i, total)
+    cachepath = getFilePath(flow_id, detect_language.__name__,ext="json")
+
+    try:
+        with open(cachepath, "r", encoding="utf-8") as file:
+            response = json.load(file)
+            return response
+    except Exception:
+        pass
+
     audio = np.load(inpath)
     lang = AIModels.get_language(audio)
     response = {
         "lang": lang,
     }
+
+    with open(cachepath, "w", encoding="utf-8") as file:
+        json.dump(response, file)
+
     return response
 
 
@@ -126,9 +174,21 @@ def detect_voice_segments(
     **metadata,
 ):
     inpath = getFilePath(flow_id, "audio", ext="npy")
+    cachepath = getFilePath(flow_id, detect_voice_segments.__name__,ext="json")
+
+    try:
+        with open(cachepath, "r", encoding="utf-8") as file:
+            response = json.load(file)
+    except Exception:
+        response = None
+
     audio = np.load(inpath)
-    chunks = AIModels.get_voice_segments(audio)
-    timestamps = [(chunk["start"], chunk["end"]) for chunk in chunks]
+    if response == None:
+        chunks = AIModels.get_voice_segments(audio)
+        timestamps = [(chunk["start"], chunk["end"]) for chunk in chunks]
+    else:
+        timestamps = response["segments_timestamps"]
+
     split_audio = [
         audio[int(s * SAMPLE_RATE) : int(e * SAMPLE_RATE)] for s, e in timestamps
     ]
@@ -138,6 +198,7 @@ def detect_voice_segments(
         for i in range(total)
     ]
     total_time = sum([e - s for s, e in timestamps])
+
 
     tasks: List[Task] = []
     for i, op, sa, (s, e) in zip(range(total), out_paths, split_audio, timestamps):
@@ -183,6 +244,8 @@ def detect_voice_segments(
         "segments_timestamps": timestamps,
         "total_useful_time": total_time,
     }
+    with open(cachepath, "w", encoding="utf-8") as file:
+        json.dump(response, file)
 
     return response
 
